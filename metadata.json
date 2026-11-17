@@ -1,0 +1,6 @@
+{
+  "name": "Покерный клуб «Чек это проигрыш»",
+  "description": "Информационная платформа, сезонный рейтинг и интерактивный Live-таймер спортивного покерного клуба «Чек это проигрыш» (Техасский Холдем).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
