@@ -13,7 +13,7 @@ import { Lock, Tv, Trophy, ShieldAlert, Spade } from 'lucide-react';
 
 export type NavTab = 'home' | 'leaderboard' | 'live' | 'admin';
 
-export const CLUB_LOGO_PATH = '/assets/aistudio/IMG_1509_1a4ff1a5.png';
+export const CLUB_LOGO_PATH = `${import.meta.env.BASE_URL}assets/aistudio/IMG_1509_1a4ff1a5.png`;
 
 const ClubLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
