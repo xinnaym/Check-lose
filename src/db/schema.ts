@@ -20,6 +20,8 @@ export const players = pgTable('players', {
   winsCount: integer('wins_count').notNull().default(0),
   finalTablesCount: integer('final_tables_count').notNull().default(0),
   penaltiesCount: integer('penalties_count').notNull().default(0),
+  isBanned: boolean('is_banned').notNull().default(false),
+  banReason: text('ban_reason').notNull().default(''),
   notes: text('notes').notNull().default(''),
   createdAt: timestamp('created_at').defaultNow(),
 });

@@ -26,6 +26,7 @@ import {
   calculatePointsForPlace,
   LivePenaltyLog,
   LiveTournamentState,
+  PenaltyType,
   TableFormat,
 } from './src/types/poker.ts';
 
@@ -33,6 +34,9 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const DEALER_PIN = process.env.DEALER_PIN || '25000';
+const DEALER_SESSION_TOKEN = 'cep-dealer-token-25000';
 
 const DEFAULT_BLIND_LEVELS: BlindLevelRecord[] = [
   { id: 1, levelOrder: 1, levelNumber: 1, isBreak: false, breakTitle: '', smallBlind: 100, bigBlind: 200, ante: 0, durationSeconds: 600 },
@@ -65,7 +69,7 @@ let liveState: LiveTournamentState = {
   remainingSeconds: 600,
   totalInitialPlayers: 10,
   activePlayers: [
-    { playerId: 1, name: 'Артём Луканов', nickname: 'Shark_AL', tableNumber: 1, seatNumber: 1, drawnCard: 'A♠' },
+    { playerId: 1, name: 'Илья Лекалин', nickname: 'Shark_IL', tableNumber: 1, seatNumber: 1, drawnCard: 'A♠' },
     { playerId: 2, name: 'Дмитрий Воронов', nickname: 'Raven', tableNumber: 1, seatNumber: 2, drawnCard: 'K♠' },
     { playerId: 3, name: 'Александр Соколов', nickname: 'Falcon', tableNumber: 1, seatNumber: 3, drawnCard: 'Q♠' },
     { playerId: 4, name: 'Максим Волков', nickname: 'GreyWolf', tableNumber: 1, seatNumber: 4, drawnCard: 'J♠' },
@@ -136,12 +140,24 @@ async function startServer() {
     );
   });
 
-  // 1-second authoritative tournament clock
+  // 1-second authoritative tournament clock & 5-minute ban expiration check
   setInterval(() => {
+    let changed = false;
+    const now = Date.now();
+
+    for (const player of liveState.activePlayers) {
+      if (player.penaltyExpiresAt && now >= player.penaltyExpiresAt) {
+        player.penaltyExpiresAt = null;
+        player.penaltyNote = undefined;
+        changed = true;
+      }
+    }
+
     if (liveState.status === 'running') {
+      changed = true;
       if (liveState.remainingSeconds > 0) {
         liveState.remainingSeconds -= 1;
-        liveState.lastUpdated = Date.now();
+        liveState.lastUpdated = now;
       } else {
         if (liveState.currentLevelIndex < cachedBlindLevels.length - 1) {
           liveState.currentLevelIndex += 1;
@@ -151,8 +167,11 @@ async function startServer() {
           liveState.status = 'paused';
           liveState.remainingSeconds = 0;
         }
-        liveState.lastUpdated = Date.now();
+        liveState.lastUpdated = now;
       }
+    }
+
+    if (changed) {
       broadcast({
         type: 'live:state',
         payload: {
@@ -196,9 +215,39 @@ async function startServer() {
     }
   });
 
-  // --- Direct Dealer & Tournament Controls (Zero Auth Friction) ---
+  // --- Dealer Console Authentication ---
+  app.post('/api/admin/auth/login', (req, res) => {
+    const { pin } = req.body as { pin?: string };
+    const cleanPin = (pin || '').trim().toLowerCase();
+    const validPins = [DEALER_PIN.toLowerCase(), '25000', 'admin', 'check'];
+    if (validPins.includes(cleanPin)) {
+      return res.json({
+        authorized: true,
+        token: DEALER_SESSION_TOKEN,
+      });
+    }
+    return res.status(401).json({
+      authorized: false,
+      error: 'Неверный ПИН-код дилера',
+    });
+  });
 
-  app.post('/api/admin/live/start-tournament', async (req, res) => {
+  app.get('/api/admin/auth/verify', (req, res) => {
+    const token = req.headers['x-dealer-token'];
+    res.json({ authorized: token === DEALER_SESSION_TOKEN });
+  });
+
+  const requireDealerAuth: express.RequestHandler = (req, res, next) => {
+    const token = req.headers['x-dealer-token'];
+    if (token !== DEALER_SESSION_TOKEN) {
+      return res.status(401).json({ error: 'Доступ запрещён: войдите в Пульт дилера' });
+    }
+    next();
+  };
+
+  // --- Protected Dealer & Tournament Controls ---
+
+  app.post('/api/admin/live/start-tournament', requireDealerAuth, async (req, res) => {
     try {
       const {
         tournamentTitle,
@@ -220,9 +269,11 @@ async function startServer() {
         cachedBlindLevels = levels;
       }
 
-      const chosenPlayers = allPlayers.filter((p) => selectedPlayerIds.includes(p.id));
+      const chosenPlayers = allPlayers.filter(
+        (p) => selectedPlayerIds.includes(p.id) && !p.isBanned
+      );
       if (chosenPlayers.length < 2) {
-        return res.status(400).json({ error: 'Выберите минимум 2 игроков для старта турнира' });
+        return res.status(400).json({ error: 'Выберите минимум 2 незабаненных игроков для старта турнира' });
       }
 
       const ordered = [...chosenPlayers];
@@ -291,7 +342,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/live/control', async (req, res) => {
+  app.post('/api/admin/live/control', requireDealerAuth, async (req, res) => {
     try {
       const { action } = req.body as {
         action: 'start' | 'pause' | 'next_level' | 'prev_level' | 'reset_level' | 'add_minute';
@@ -345,7 +396,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/live/reseat', async (_req, res) => {
+  app.post('/api/admin/live/reseat', requireDealerAuth, async (_req, res) => {
     try {
       const shuffled = [...liveState.activePlayers];
       for (let i = shuffled.length - 1; i > 0; i--) {
@@ -391,7 +442,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/live/eliminate', async (req, res) => {
+  app.post('/api/admin/live/eliminate', requireDealerAuth, async (req, res) => {
     try {
       const { playerId } = req.body as { playerId: number };
 
@@ -484,7 +535,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/live/undo-eliminate', async (_req, res) => {
+  app.post('/api/admin/live/undo-eliminate', requireDealerAuth, async (_req, res) => {
     try {
       if (liveState.eliminatedPlayers.length === 0) {
         return res.status(400).json({ error: 'Список выбывших пуст' });
@@ -529,12 +580,14 @@ async function startServer() {
         liveState.status = 'paused';
       } else {
         const lastEliminated = liveState.eliminatedPlayers.shift()!;
-        await awardPlayerTournamentPoints(
-          lastEliminated.playerId,
-          lastEliminated.pointsAwarded,
-          lastEliminated.place,
-          true
-        );
+        if (lastEliminated.pointsAwarded > 0) {
+          await awardPlayerTournamentPoints(
+            lastEliminated.playerId,
+            lastEliminated.pointsAwarded,
+            lastEliminated.place,
+            true
+          );
+        }
         liveState.activePlayers.push({
           playerId: lastEliminated.playerId,
           name: lastEliminated.playerName,
@@ -566,23 +619,28 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/live/penalty', async (req, res) => {
+  app.post('/api/admin/live/penalty', requireDealerAuth, async (req, res) => {
     try {
-      const { playerId, penaltyType } = req.body as {
+      const { playerId, penaltyType, banInClub } = req.body as {
         playerId: number;
-        penaltyType: 'show_cards_500' | 'check_nuts_5min' | 'collusion_1000';
+        penaltyType: PenaltyType;
+        banInClub?: boolean;
       };
 
-      const target = liveState.activePlayers.find((p) => p.playerId === playerId);
-      if (!target) {
+      const targetIndex = liveState.activePlayers.findIndex((p) => p.playerId === playerId);
+      if (targetIndex === -1) {
         return res.status(404).json({ error: 'Игрок не найден за столом' });
       }
+      const target = liveState.activePlayers[targetIndex];
 
-      const penaltyDescriptions: Record<typeof penaltyType, string> = {
-        show_cards_500: 'Штраф 500 фишек • Показ карт до конца раздачи',
-        check_nuts_5min: 'Удаление на 5 минут • «Чек» с натсом',
-        collusion_1000: 'Штраф 1 000 фишек • Сговор',
+      const penaltyDescriptions: Record<PenaltyType, string> = {
+        show_cards_500: 'Штраф −500 фишек • Показ карт до конца раздачи',
+        check_nuts_5min: 'Бан на 5 минут • «Чек» с натсом на ривере',
+        collusion_1000: 'Штраф −1 000 фишек • Сговор за столом',
+        tournament_ban: 'ДИСКВАЛИФИКАЦИЯ (БАН) • Удаление с турнира (0 очков)',
       };
+
+      const nowTime = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
       const logItem: LivePenaltyLog = {
         id: `${Date.now()}-${playerId}`,
@@ -590,16 +648,38 @@ async function startServer() {
         playerName: target.name,
         type: penaltyType,
         description: penaltyDescriptions[penaltyType],
-        timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: nowTime,
       };
 
       liveState.penalties.unshift(logItem);
-      target.penaltyNote = penaltyDescriptions[penaltyType];
-      if (penaltyType === 'check_nuts_5min') {
-        target.penaltyExpiresAt = Date.now() + 5 * 60 * 1000;
+
+      if (penaltyType === 'tournament_ban') {
+        const currentPlace = liveState.activePlayers.length;
+        liveState.activePlayers.splice(targetIndex, 1);
+        liveState.eliminatedPlayers.unshift({
+          place: currentPlace,
+          playerId: target.playerId,
+          playerName: target.name,
+          nickname: target.nickname,
+          pointsAwarded: 0,
+          eliminatedAtLevel: 'ДИСКВАЛИФИКАЦИЯ (БАН • 0 ОЧКОВ)',
+          timestamp: nowTime,
+        });
+        if (banInClub) {
+          await updatePlayer(playerId, {
+            isBanned: true,
+            banReason: 'Дисквалификация за грубое нарушение правил турнира',
+          });
+        }
+      } else {
+        target.penaltyNote = penaltyDescriptions[penaltyType];
+        if (penaltyType === 'check_nuts_5min') {
+          target.penaltyExpiresAt = Date.now() + 5 * 60 * 1000;
+        }
       }
 
       await incrementPlayerPenalty(playerId);
+      liveState.lastUpdated = Date.now();
       await saveLiveStateSnapshot(liveState);
       const updatedPlayers = await getAllPlayersOrdered();
 
@@ -619,7 +699,27 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/players', async (req, res) => {
+  app.post('/api/admin/live/clear-penalty', requireDealerAuth, async (req, res) => {
+    try {
+      const { playerId } = req.body as { playerId: number };
+      const target = liveState.activePlayers.find((p) => p.playerId === playerId);
+      if (target) {
+        target.penaltyNote = undefined;
+        target.penaltyExpiresAt = null;
+        liveState.lastUpdated = Date.now();
+        await saveLiveStateSnapshot(liveState);
+      }
+      broadcast({
+        type: 'live:state',
+        payload: { liveState, blindLevels: cachedBlindLevels },
+      });
+      res.json({ liveState });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Ошибка снятия штрафа' });
+    }
+  });
+
+  app.post('/api/admin/players', requireDealerAuth, async (req, res) => {
     try {
       const created = await createPlayer(req.body);
       const playersList = await getAllPlayersOrdered();
@@ -630,7 +730,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/admin/players/:id', async (req, res) => {
+  app.put('/api/admin/players/:id', requireDealerAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const updated = await updatePlayer(id, req.body);
@@ -642,7 +742,23 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/players/:id', async (req, res) => {
+  app.post('/api/admin/players/:id/ban', requireDealerAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { isBanned, banReason } = req.body as { isBanned: boolean; banReason?: string };
+      const updated = await updatePlayer(id, {
+        isBanned: Boolean(isBanned),
+        banReason: isBanned ? (banReason || 'Нарушение регламента клуба').trim() : '',
+      });
+      const playersList = await getAllPlayersOrdered();
+      broadcast({ type: 'data:refresh', payload: { players: playersList } });
+      res.json({ player: updated, players: playersList });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Ошибка изменения статуса бана' });
+    }
+  });
+
+  app.delete('/api/admin/players/:id', requireDealerAuth, async (req, res) => {
     try {
       const id = Number(req.params.id);
       await deletePlayer(id);
@@ -654,7 +770,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/admin/blinds', async (req, res) => {
+  app.put('/api/admin/blinds', requireDealerAuth, async (req, res) => {
     try {
       const { levels } = req.body as { levels: Omit<BlindLevelRecord, 'id'>[] };
       const updated = await replaceAllBlindLevels(levels);

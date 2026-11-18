@@ -4,10 +4,13 @@ import {
   BlindLevelRecord,
   ClubContentRecord,
   LiveTournamentState,
+  PenaltyType,
   PlayerRecord,
   TableFormat,
   TournamentArchiveRecord,
 } from '../types/poker.ts';
+
+const DEALER_TOKEN_STORAGE_KEY = 'cep_dealer_token';
 
 interface ClubContextValue {
   players: PlayerRecord[];
@@ -19,11 +22,16 @@ interface ClubContextValue {
   loading: boolean;
   error: string | null;
   wsConnected: boolean;
+  isDealerAuthorized: boolean;
+  loginDealer: (pin: string) => Promise<void>;
+  logoutDealer: () => void;
   refreshAll: () => Promise<void>;
   controlTimer: (action: 'start' | 'pause' | 'next_level' | 'prev_level' | 'reset_level' | 'add_minute') => Promise<void>;
   eliminatePlayer: (playerId: number) => Promise<void>;
   undoLastElimination: () => Promise<void>;
-  issuePenalty: (playerId: number, penaltyType: 'show_cards_500' | 'check_nuts_5min' | 'collusion_1000') => Promise<void>;
+  issuePenalty: (playerId: number, penaltyType: PenaltyType, banInClub?: boolean) => Promise<void>;
+  clearPlayerPenalty: (playerId: number) => Promise<void>;
+  togglePlayerBan: (playerId: number, isBanned: boolean, banReason?: string) => Promise<void>;
   reseatActivePlayers: () => Promise<void>;
   startNewTournament: (params: {
     tournamentTitle: string;
@@ -49,9 +57,39 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [dealerToken, setDealerToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(DEALER_TOKEN_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [isDealerAuthorized, setIsDealerAuthorized] = useState<boolean>(Boolean(dealerToken));
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+
+  const verifyDealerToken = useCallback(async (tokenToVerify: string | null) => {
+    if (!tokenToVerify) {
+      setIsDealerAuthorized(false);
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/auth/verify', {
+        headers: { 'x-dealer-token': tokenToVerify },
+      });
+      const data = await res.json();
+      if (data.authorized) {
+        setIsDealerAuthorized(true);
+      } else {
+        setIsDealerAuthorized(false);
+        setDealerToken(null);
+        localStorage.removeItem(DEALER_TOKEN_STORAGE_KEY);
+      }
+    } catch {
+      // Keep local token state if network momentarily hiccups
+    }
+  }, []);
 
   const refreshAll = useCallback(async () => {
     try {
@@ -74,6 +112,10 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    verifyDealerToken(dealerToken);
+  }, [dealerToken, verifyDealerToken]);
 
   useEffect(() => {
     let isMounted = true;
@@ -129,15 +171,53 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [refreshAll]);
 
-  const apiCall = async (url: string, options: RequestInit = {}) => {
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
+  const loginDealer = async (pin: string) => {
+    const res = await fetch('/api/admin/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
     });
     const data = await res.json();
+    if (!res.ok || !data.authorized) {
+      throw new Error(data.error || 'Неверный ПИН-код дилера');
+    }
+    try {
+      localStorage.setItem(DEALER_TOKEN_STORAGE_KEY, data.token);
+    } catch {
+      // ignore storage errors
+    }
+    setDealerToken(data.token);
+    setIsDealerAuthorized(true);
+  };
+
+  const logoutDealer = () => {
+    try {
+      localStorage.removeItem(DEALER_TOKEN_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    setDealerToken(null);
+    setIsDealerAuthorized(false);
+  };
+
+  const apiCall = async (url: string, options: RequestInit = {}) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...((options.headers as Record<string, string>) || {}),
+    };
+    if (dealerToken) {
+      headers['x-dealer-token'] = dealerToken;
+    }
+
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
+    const data = await res.json();
+    if (res.status === 401) {
+      logoutDealer();
+      throw new Error(data.error || 'Требуется авторизация дилера');
+    }
     if (!res.ok) {
       throw new Error(data.error || 'Ошибка выполнения запроса');
     }
@@ -174,13 +254,30 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const issuePenalty = async (
     playerId: number,
-    penaltyType: 'show_cards_500' | 'check_nuts_5min' | 'collusion_1000'
+    penaltyType: PenaltyType,
+    banInClub?: boolean
   ) => {
     const data = await apiCall('/api/admin/live/penalty', {
       method: 'POST',
-      body: JSON.stringify({ playerId, penaltyType }),
+      body: JSON.stringify({ playerId, penaltyType, banInClub }),
     });
     if (data.liveState) setLiveState(data.liveState);
+    if (data.players) setPlayers(data.players);
+  };
+
+  const clearPlayerPenalty = async (playerId: number) => {
+    const data = await apiCall('/api/admin/live/clear-penalty', {
+      method: 'POST',
+      body: JSON.stringify({ playerId }),
+    });
+    if (data.liveState) setLiveState(data.liveState);
+  };
+
+  const togglePlayerBan = async (playerId: number, isBanned: boolean, banReason?: string) => {
+    const data = await apiCall(`/api/admin/players/${playerId}/ban`, {
+      method: 'POST',
+      body: JSON.stringify({ isBanned, banReason }),
+    });
     if (data.players) setPlayers(data.players);
   };
 
@@ -245,11 +342,16 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         wsConnected,
+        isDealerAuthorized,
+        loginDealer,
+        logoutDealer,
         refreshAll,
         controlTimer,
         eliminatePlayer,
         undoLastElimination,
         issuePenalty,
+        clearPlayerPenalty,
+        togglePlayerBan,
         reseatActivePlayers,
         startNewTournament,
         addPlayer,

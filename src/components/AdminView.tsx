@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
-import { calculatePointsForPlace, TableFormat } from '../types/poker.ts';
+import { calculatePointsForPlace, PenaltyType, TableFormat } from '../types/poker.ts';
+import { CLUB_LOGO_PATH } from '../App.tsx';
 import {
   Play,
   Pause,
@@ -11,6 +12,15 @@ import {
   UserMinus,
   Undo2,
   Plus,
+  Lock,
+  LogOut,
+  ShieldAlert,
+  Ban,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Search,
+  KeyRound,
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
@@ -18,31 +28,53 @@ export const AdminView: React.FC = () => {
     players,
     blindLevels,
     liveState,
+    isDealerAuthorized,
+    loginDealer,
+    logoutDealer,
     controlTimer,
     eliminatePlayer,
     undoLastElimination,
+    issuePenalty,
+    clearPlayerPenalty,
+    togglePlayerBan,
     reseatActivePlayers,
     startNewTournament,
     addPlayer,
+    editPlayer,
   } = useClub();
+
+  const [pinInput, setPinInput] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [expandedPenaltyPlayerId, setExpandedPenaltyPlayerId] = useState<number | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   const [newTitle, setNewTitle] = useState('Вечерний Холдем • Турнир #2');
   const [newFormat, setNewFormat] = useState<TableFormat>('1_table');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [quickPlayerName, setQuickPlayerName] = useState('');
 
+  const [memberSearch, setMemberSearch] = useState('');
+  const [banReasonInput, setBanReasonInput] = useState<Record<number, string>>({});
+
   useEffect(() => {
-    if (players.length > 0 && selectedIds.length === 0) {
-      setSelectedIds(players.slice(0, 10).map((p) => p.id));
+    const timer = window.setInterval(() => setNowTs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const eligible = players.filter((p) => !p.isBanned);
+    if (eligible.length > 0 && selectedIds.length === 0) {
+      setSelectedIds(eligible.slice(0, 10).map((p) => p.id));
     }
   }, [players, selectedIds.length]);
 
   const showNotice = (msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 3000);
+    window.setTimeout(() => setToast(null), 3500);
   };
 
   const run = async (fn: () => Promise<void>, message?: string) => {
@@ -50,21 +82,113 @@ export const AdminView: React.FC = () => {
     try {
       await fn();
       if (message) showNotice(message);
+    } catch (err: any) {
+      showNotice(err.message || 'Ошибка выполнения операции');
     } finally {
       setBusy(false);
     }
   };
 
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinInput.trim()) return;
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      await loginDealer(pinInput.trim());
+      setPinInput('');
+    } catch (err: any) {
+      setAuthError(err.message || 'Неверный ПИН-код дилера');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // --- AUTHORIZATION GATE ---
+  if (!isDealerAuthorized) {
+    return (
+      <div className="mx-auto max-w-md py-6 sm:py-12">
+        <div className="glass-panel rounded-3xl p-6 sm:p-8 text-center space-y-6">
+          <div className="mx-auto relative h-24 w-24 overflow-hidden rounded-full border-2 border-[#F97316]/60 bg-black shadow-[0_0_32px_-6px_rgba(249,115,22,0.5)]">
+            <img
+              src={CLUB_LOGO_PATH}
+              alt="Покерный клуб Чек это проигрыш"
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 rounded-lg bg-[#F97316]/15 px-3 py-1 text-xs font-bold text-[#F97316]">
+              <Lock className="h-3.5 w-3.5" />
+              <span>ЗАЩИЩЁННЫЙ ДОСТУП</span>
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
+              Пульт дилера
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+              Управление турнирным таймером, вылетами, штрафами и банами доступно только
+              авторизованному дилеру клуба.
+            </p>
+          </div>
+
+          <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                ПИН-код или пароль дилера
+              </label>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="Введите ПИН-код (25000)..."
+                  autoFocus
+                  className="glass-well w-full rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {authError && (
+              <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3.5 py-2.5 text-xs font-semibold text-rose-300">
+                {authError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={authLoading || !pinInput.trim()}
+              className="btn-crimson w-full rounded-xl py-3 text-sm font-extrabold disabled:opacity-40 cursor-pointer"
+            >
+              {authLoading ? 'Проверка доступа...' : 'Войти в Пульт дилера'}
+            </button>
+          </form>
+
+          <div className="border-t border-white/10 pt-4 flex items-center justify-between gap-2 text-xs text-slate-400">
+            <span>Клубный ПИН по умолчанию:</span>
+            <button
+              type="button"
+              onClick={() => setPinInput('25000')}
+              className="btn-glass rounded-lg px-2.5 py-1 font-mono-tabular font-bold text-[#F97316] hover:text-white cursor-pointer"
+            >
+              Подставить 25000
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!liveState) {
     return (
-      <div className="glass-panel rounded-3xl p-12 text-center text-slate-400">
+      <div className="glass-panel rounded-3xl p-8 sm:p-12 text-center text-slate-400">
         Загрузка пульта дилера...
       </div>
     );
   }
 
-  const currentLevel =
-    blindLevels[liveState.currentLevelIndex] || blindLevels[0];
+  const currentLevel = blindLevels[liveState.currentLevelIndex] || blindLevels[0];
 
   const nextElimPlace = liveState.activePlayers.length;
   const nextElimPoints =
@@ -78,7 +202,19 @@ export const AdminView: React.FC = () => {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  const formatBanCountdown = (expiresAt?: number | null) => {
+    if (!expiresAt) return null;
+    const diffSec = Math.max(0, Math.ceil((expiresAt - nowTs) / 1000));
+    if (diffSec <= 0) return null;
+    return formatClock(diffSec);
+  };
+
   const toggleSelect = (id: number) => {
+    const targetPlayer = players.find((p) => p.id === id);
+    if (targetPlayer?.isBanned) {
+      showNotice(`Игрок ${targetPlayer.name} забанен в клубе. Снимите бан ниже для допуска.`);
+      return;
+    }
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
@@ -90,38 +226,76 @@ export const AdminView: React.FC = () => {
     await run(async () => {
       await addPlayer({ name: quickPlayerName.trim(), nickname: '' });
       setQuickPlayerName('');
-    }, `Игрок ${quickPlayerName} добавлен в список`);
+    }, `Игрок ${quickPlayerName} добавлен в список клуба`);
   };
 
+  const handleIssueTablePenalty = async (
+    playerId: number,
+    playerName: string,
+    type: PenaltyType,
+    banInClub = false
+  ) => {
+    const labels: Record<PenaltyType, string> = {
+      show_cards_500: `${playerName}: Штраф −500 фишек (Показ карт)`,
+      check_nuts_5min: `${playerName}: Бан на 5 минут («Чек» с натсом)`,
+      collusion_1000: `${playerName}: Штраф −1 000 фишек (Сговор)`,
+      tournament_ban: `${playerName}: Дисквалификация с турнира (0 очков)`,
+    };
+    await run(async () => {
+      await issuePenalty(playerId, type, banInClub);
+      setExpandedPenaltyPlayerId(null);
+    }, labels[type]);
+  };
+
+  const filteredClubMembers = players.filter(
+    (p) =>
+      p.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+      p.nickname.toLowerCase().includes(memberSearch.toLowerCase())
+  );
+
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-6 sm:space-y-8 pb-16">
       {toast && (
-        <div className="glass-crimson rounded-2xl px-5 py-3 text-xs font-bold text-white">
-          {toast}
+        <div className="glass-crimson sticky top-20 z-30 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 sm:px-5 text-xs font-bold text-white shadow-xl">
+          <span>{toast}</span>
+          <button
+            onClick={() => setToast(null)}
+            className="text-orange-200 hover:text-white cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
       )}
 
       {/* 1. TIMER & LEVEL CONTROLS */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-8">
-        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
-          <div>
-            <div className="text-xs font-bold text-[#F97316]">
-              ПУЛЬТ ДИЛЕРА · МГНОВЕННАЯ СИНХРОНИЗАЦИЯ С ТВ
+      <div className="glass-panel rounded-3xl p-5 sm:p-8">
+        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-xs font-bold text-[#F97316]">
+                ПУЛЬТ ДИЛЕРА · АВТОРИЗОВАН
+              </span>
+              <button
+                onClick={logoutDealer}
+                className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:text-white cursor-pointer"
+              >
+                <LogOut className="h-3 w-3 text-[#F97316]" />
+                <span>Выйти</span>
+              </button>
             </div>
-            <h1 className="font-display mt-1 text-2xl font-extrabold text-white sm:text-3xl">
+            <h1 className="font-display text-xl font-extrabold text-white sm:text-3xl">
               {liveState.tournamentTitle}
             </h1>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="text-xs text-slate-400">
               {currentLevel?.isBreak
                 ? currentLevel.breakTitle
                 : `Уровень #${currentLevel?.levelNumber ?? 1} · Блайнды ${currentLevel?.smallBlind}/${currentLevel?.bigBlind}`}{' '}
-              · Осталось за столом: {liveState.activePlayers.length} из{' '}
-              {liveState.totalInitialPlayers}
+              · За столом: {liveState.activePlayers.length} из {liveState.totalInitialPlayers}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="glass-well font-mono-tabular mr-2 rounded-2xl px-5 py-2.5 text-3xl font-extrabold text-white">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <div className="glass-well font-mono-tabular flex-1 sm:flex-initial text-center rounded-2xl px-4 py-2.5 text-2xl sm:text-3xl font-extrabold text-white">
               {formatClock(liveState.remainingSeconds)}
             </div>
 
@@ -129,7 +303,7 @@ export const AdminView: React.FC = () => {
               <button
                 disabled={busy}
                 onClick={() => run(() => controlTimer('pause'))}
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-xs font-extrabold text-black hover:bg-amber-300 cursor-pointer"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-xs font-extrabold text-black hover:bg-amber-300 cursor-pointer"
               >
                 <Pause className="h-4 w-4" />
                 <span>Пауза</span>
@@ -138,67 +312,69 @@ export const AdminView: React.FC = () => {
               <button
                 disabled={busy}
                 onClick={() => run(() => controlTimer('start'))}
-                className="btn-crimson inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs font-extrabold cursor-pointer"
+                className="btn-crimson flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-xs font-extrabold cursor-pointer"
               >
                 <Play className="h-4 w-4" />
                 <span>Старт таймера</span>
               </button>
             )}
 
-            <button
-              disabled={busy}
-              onClick={() => run(() => controlTimer('prev_level'))}
-              className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-3.5 py-3 text-xs font-semibold text-white cursor-pointer"
-            >
-              <SkipBack className="h-4 w-4" />
-              <span>Пред.</span>
-            </button>
+            <div className="flex w-full sm:w-auto items-center gap-2">
+              <button
+                disabled={busy}
+                onClick={() => run(() => controlTimer('prev_level'))}
+                className="btn-glass flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs font-semibold text-white cursor-pointer"
+              >
+                <SkipBack className="h-3.5 w-3.5" />
+                <span>Пред.</span>
+              </button>
 
-            <button
-              disabled={busy}
-              onClick={() => run(() => controlTimer('next_level'))}
-              className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-3.5 py-3 text-xs font-semibold text-white cursor-pointer"
-            >
-              <SkipForward className="h-4 w-4" />
-              <span>След. уровень</span>
-            </button>
+              <button
+                disabled={busy}
+                onClick={() => run(() => controlTimer('next_level'))}
+                className="btn-glass flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs font-semibold text-white cursor-pointer"
+              >
+                <SkipForward className="h-3.5 w-3.5" />
+                <span>След.</span>
+              </button>
 
-            <button
-              disabled={busy}
-              onClick={() => run(() => controlTimer('reset_level'))}
-              className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-3.5 py-3 text-xs font-medium text-slate-300 hover:text-white cursor-pointer"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span>Сброс 10:00</span>
-            </button>
+              <button
+                disabled={busy}
+                onClick={() => run(() => controlTimer('reset_level'))}
+                className="btn-glass flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-300 hover:text-white cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>10:00</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 2. ACTIVE PLAYERS & ONE-CLICK ELIMINATION */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-8">
+      {/* 2. ACTIVE PLAYERS, ONE-CLICK ELIMINATION & TABLE PENALTIES/BANS */}
+      <div className="glass-panel rounded-3xl p-5 sm:p-8">
         <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center">
           <div>
-            <h2 className="font-display text-2xl font-bold text-white">
+            <h2 className="font-display text-xl sm:text-2xl font-bold text-white">
               Игроки за столом ({liveState.activePlayers.length})
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Нажмите «Выбыл» — система сама выдаст{' '}
-              <strong className="text-white">#{nextElimPlace} место</strong> и начислит{' '}
-              <strong className="text-emerald-400">+{nextElimPoints} очков</strong> в сезонный рейтинг
+              «Выбыл» выдаёт <strong className="text-white">#{nextElimPlace} место</strong> (
+              <strong className="text-emerald-400">+{nextElimPoints} очк.</strong>) · «Штраф / Бан»
+              наказывает за показ карт, чек с натсом или сговор
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               disabled={busy || liveState.activePlayers.length < 2}
               onClick={() =>
-                run(() => reseatActivePlayers(), 'Рассадка по боксам (карты A–10) обновлена')
+                run(() => reseatActivePlayers(), 'Рассадка по столам и боксам обновлена')
               }
-              className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-white cursor-pointer"
+              className="btn-glass flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-white cursor-pointer"
             >
               <Shuffle className="h-3.5 w-3.5 text-[#F97316]" />
-              <span>Раздать боксы (A–10)</span>
+              <span>Пересадить боксы</span>
             </button>
 
             {liveState.eliminatedPlayers.length > 0 && (
@@ -207,7 +383,7 @@ export const AdminView: React.FC = () => {
                 onClick={() =>
                   run(() => undoLastElimination(), 'Последнее выбывание отменено')
                 }
-                className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white cursor-pointer"
+                className="btn-glass flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-300 hover:text-white cursor-pointer"
               >
                 <Undo2 className="h-3.5 w-3.5" />
                 <span>Отменить вылет</span>
@@ -216,65 +392,379 @@ export const AdminView: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
-          {liveState.activePlayers.map((player) => (
-            <div
-              key={player.playerId}
-              className="glass-well flex items-center justify-between gap-4 rounded-2xl p-4"
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div
-                  className={`font-mono-tabular flex h-10 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-xs font-extrabold ${
-                    player.drawnCard.includes('♥') || player.drawnCard.includes('♦')
-                      ? 'text-[#F97316]'
-                      : 'text-white'
-                  }`}
-                >
-                  {player.drawnCard}
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-white">{player.name}</div>
-                  <div className="text-xs text-slate-400">
-                    Стол {player.tableNumber} · Бокс #{player.seatNumber}
+        <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+          {liveState.activePlayers.map((player) => {
+            const isPenaltyOpen = expandedPenaltyPlayerId === player.playerId;
+            const banTimer = formatBanCountdown(player.penaltyExpiresAt);
+            const hasActivePenalty = Boolean(player.penaltyNote || banTimer);
+
+            return (
+              <div
+                key={player.playerId}
+                className={`rounded-2xl p-4 transition-all ${
+                  hasActivePenalty
+                    ? 'border border-[#F97316]/60 bg-[#F97316]/10'
+                    : 'glass-well'
+                }`}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="font-mono-tabular flex h-10 w-12 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/50 text-xs font-extrabold text-[#F97316]">
+                      <span className="text-[10px] font-normal text-slate-400">Бокс</span>
+                      <span>#{player.seatNumber}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold text-white">
+                        {player.name}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        Стол {player.tableNumber} · Место #{player.seatNumber}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        setExpandedPenaltyPlayerId(isPenaltyOpen ? null : player.playerId)
+                      }
+                      className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer ${
+                        isPenaltyOpen
+                          ? 'bg-[#F97316] text-black'
+                          : 'btn-glass text-orange-300 hover:text-white'
+                      }`}
+                    >
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      <span>Штраф / Бан</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          () => eliminatePlayer(player.playerId),
+                          `${player.name} — #${nextElimPlace} место (+${nextElimPoints} очк.)`
+                        )
+                      }
+                      className="btn-crimson flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                      <span>
+                        Выбыл (#{nextElimPlace} · +{nextElimPoints})
+                      </span>
+                    </button>
                   </div>
                 </div>
-              </div>
 
-              <button
-                disabled={busy}
-                onClick={() =>
-                  run(
-                    () => eliminatePlayer(player.playerId),
-                    `${player.name} — #${nextElimPlace} место (+${nextElimPoints} очк.)`
-                  )
-                }
-                className="btn-crimson inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                <UserMinus className="h-3.5 w-3.5" />
-                <span>
-                  Выбыл (#{nextElimPlace} · +{nextElimPoints})
-                </span>
-              </button>
-            </div>
-          ))}
+                {/* Active Penalty / 5-min Ban Banner on Player */}
+                {hasActivePenalty && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#F97316]/40 bg-black/40 px-3 py-2 text-xs">
+                    <div className="flex items-center gap-2 font-bold text-[#F97316]">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{player.penaltyNote}</span>
+                      {banTimer && (
+                        <span className="font-mono-tabular rounded bg-[#F97316] px-1.5 py-0.5 text-[11px] font-extrabold text-black">
+                          {banTimer}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          () => clearPlayerPenalty(player.playerId),
+                          `Штраф/бан игрока ${player.name} снят`
+                        )
+                      }
+                      className="text-xs font-semibold text-slate-300 underline hover:text-white cursor-pointer"
+                    >
+                      Снять штраф
+                    </button>
+                  </div>
+                )}
+
+                {/* Expandable Penalty & Ban Controls for this Table Player */}
+                {isPenaltyOpen && (
+                  <div className="mt-3 space-y-2.5 border-t border-white/10 pt-3">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Выберите санкцию для игрока «{player.name}»:
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          handleIssueTablePenalty(
+                            player.playerId,
+                            player.name,
+                            'show_cards_500'
+                          )
+                        }
+                        className="btn-glass flex items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-white hover:border-amber-400/50 cursor-pointer"
+                      >
+                        <span>Показ карт до конца раздачи</span>
+                        <span className="font-mono-tabular font-extrabold text-amber-400 ml-2 shrink-0">
+                          −500 фишек
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          handleIssueTablePenalty(
+                            player.playerId,
+                            player.name,
+                            'check_nuts_5min'
+                          )
+                        }
+                        className="btn-glass flex items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-white hover:border-[#F97316]/60 cursor-pointer"
+                      >
+                        <span>«Чек» с натсом на ривере</span>
+                        <span className="font-mono-tabular font-extrabold text-[#F97316] ml-2 shrink-0">
+                          Бан 5 мин
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          handleIssueTablePenalty(
+                            player.playerId,
+                            player.name,
+                            'collusion_1000'
+                          )
+                        }
+                        className="btn-glass flex items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-white hover:border-rose-400/50 cursor-pointer"
+                      >
+                        <span>Сговор / софт-плей за столом</span>
+                        <span className="font-mono-tabular font-extrabold text-rose-400 ml-2 shrink-0">
+                          −1 000 фишек
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          handleIssueTablePenalty(
+                            player.playerId,
+                            player.name,
+                            'tournament_ban',
+                            true
+                          )
+                        }
+                        className="flex items-center justify-between rounded-xl border border-rose-500/50 bg-rose-500/15 px-3 py-2 text-left text-xs font-bold text-rose-200 hover:bg-rose-500/25 cursor-pointer"
+                      >
+                        <span>Дисквалификация + Бан в клубе</span>
+                        <span className="font-mono-tabular font-extrabold text-rose-400 ml-2 shrink-0">
+                          БАН (0 очк.)
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {liveState.activePlayers.length === 0 && (
-            <div className="col-span-2 py-8 text-center text-sm font-bold text-emerald-400">
+            <div className="col-span-full py-8 text-center text-sm font-bold text-emerald-400">
               Турнир завершён! Все очки начислены в рейтинг. Запустите следующую игру ниже.
             </div>
           )}
         </div>
       </div>
 
-      {/* 3. START NEW EVENING GAME (1 OR 2 TABLES) */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-8">
+      {/* 3. CLUB-WIDE PENALTIES & BAN LIST MANAGEMENT */}
+      <div className="glass-panel rounded-3xl p-5 sm:p-8">
         <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center">
           <div>
-            <h2 className="font-display text-2xl font-bold text-white">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F97316]">
+              <Ban className="h-3.5 w-3.5" />
+              <span>ДИСЦИПЛИНАРНЫЙ КОНТРОЛЬ КЛУБА</span>
+            </div>
+            <h2 className="font-display mt-1 text-xl sm:text-2xl font-bold text-white">
+              Штрафы и бан участников ({players.length})
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Забаненные игроки не допускаются к посадке за стол в новых турнирах до снятия бана
+            </p>
+          </div>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              placeholder="Поиск участника..."
+              className="glass-well w-full rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-400 focus:border-[#F97316] focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+          {filteredClubMembers.map((member) => {
+            const customReason = banReasonInput[member.id] ?? member.banReason ?? '';
+            return (
+              <div
+                key={member.id}
+                className={`flex flex-col justify-between gap-3 rounded-2xl p-4 transition-all ${
+                  member.isBanned
+                    ? 'border border-rose-500/50 bg-rose-950/25'
+                    : 'glass-well'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-bold text-white">
+                        {member.name}
+                      </span>
+                      {member.isBanned ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[10px] font-extrabold text-rose-300">
+                          <XCircle className="h-3 w-3" />
+                          ЗАБАНЕН
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                          <CheckCircle2 className="h-3 w-3" />
+                          ДОПУЩЕН
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                      <span>Очки: {member.seasonPoints}</span>
+                      <span>·</span>
+                      <span
+                        className={
+                          member.penaltiesCount > 0 ? 'font-bold text-[#F97316]' : ''
+                        }
+                      >
+                        Штрафов за сезон: {member.penaltiesCount}
+                      </span>
+                    </div>
+
+                    {member.isBanned && member.banReason && (
+                      <div className="mt-1.5 text-xs font-medium text-rose-300">
+                        Причина: {member.banReason}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Penalty Counter Controls */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          () =>
+                            editPlayer(member.id, {
+                              penaltiesCount: member.penaltiesCount + 1,
+                            }),
+                          `+1 штраф начислен игроку ${member.name}`
+                        )
+                      }
+                      className="btn-glass rounded-lg px-2.5 py-1.5 text-xs font-bold text-orange-300 hover:text-white cursor-pointer"
+                      title="Добавить штраф"
+                    >
+                      +1 штраф
+                    </button>
+                    {member.penaltiesCount > 0 && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          run(
+                            () => editPlayer(member.id, { penaltiesCount: 0 }),
+                            `Штрафы игрока ${member.name} сброшены`
+                          )
+                        }
+                        className="btn-glass rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:text-white cursor-pointer"
+                        title="Сбросить штрафы"
+                      >
+                        Сброс
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ban / Unban Controls */}
+                <div className="flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:items-center">
+                  {!member.isBanned ? (
+                    <>
+                      <input
+                        type="text"
+                        value={customReason}
+                        onChange={(e) =>
+                          setBanReasonInput((prev) => ({
+                            ...prev,
+                            [member.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="Причина бана (сговор, чек с натсом...)"
+                        className="glass-well flex-1 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          run(
+                            () =>
+                              togglePlayerBan(
+                                member.id,
+                                true,
+                                customReason || 'Нарушение правил клуба'
+                              ),
+                            `${member.name} забанен в клубе`
+                          )
+                        }
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/50 bg-rose-500/15 px-3.5 py-1.5 text-xs font-extrabold text-rose-300 hover:bg-rose-500/25 whitespace-nowrap shrink-0 cursor-pointer"
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                        <span>Забанить</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        run(
+                          () => togglePlayerBan(member.id, false, ''),
+                          `Бан с игрока ${member.name} снят`
+                        )
+                      }
+                      className="btn-glass w-full inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-extrabold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span>Разбанить и вернуть допуск к играм</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. START NEW EVENING GAME (1 OR 2 TABLES) */}
+      <div className="glass-panel rounded-3xl p-5 sm:p-8">
+        <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="font-display text-xl sm:text-2xl font-bold text-white">
               Запустить новый турнир вечера
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Стартовый стек 25 000 фишек · Автоматическая жеребьёвка мест картами от Туза до Десятки
+              Стартовый стек 25 000 фишек · Автоматическая рассадка по столам и боксам
             </p>
           </div>
 
@@ -284,7 +774,7 @@ export const AdminView: React.FC = () => {
               placeholder="Имя нового игрока..."
               value={quickPlayerName}
               onChange={(e) => setQuickPlayerName(e.target.value)}
-              className="glass-well rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none"
+              className="glass-well flex-1 sm:w-48 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none"
             />
             <button
               type="submit"
@@ -314,9 +804,14 @@ export const AdminView: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setNewFormat('1_table');
-                  setSelectedIds(players.slice(0, 10).map((p) => p.id));
+                  setSelectedIds(
+                    players
+                      .filter((p) => !p.isBanned)
+                      .slice(0, 10)
+                      .map((p) => p.id)
+                  );
                 }}
-                className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
+                className={`flex-1 rounded-lg py-2 px-2 text-xs font-extrabold transition-all cursor-pointer ${
                   newFormat === '1_table' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -326,9 +821,14 @@ export const AdminView: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setNewFormat('2_tables');
-                  setSelectedIds(players.slice(0, 16).map((p) => p.id));
+                  setSelectedIds(
+                    players
+                      .filter((p) => !p.isBanned)
+                      .slice(0, 16)
+                      .map((p) => p.id)
+                  );
                 }}
-                className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
+                className={`flex-1 rounded-lg py-2 px-2 text-xs font-extrabold transition-all cursor-pointer ${
                   newFormat === '2_tables' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -342,23 +842,25 @@ export const AdminView: React.FC = () => {
           <div className="text-xs font-semibold text-slate-300">
             Отметьте участников на вечер ({selectedIds.length} выбрано):
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          <div className="mt-3 grid grid-cols-1 gap-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
             {players.map((p) => {
-              const active = selectedIds.includes(p.id);
+              const active = selectedIds.includes(p.id) && !p.isBanned;
               return (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => toggleSelect(p.id)}
                   className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-left text-xs font-medium transition-all cursor-pointer ${
-                    active
-                      ? 'glass-crimson text-white font-bold'
-                      : 'glass-well text-slate-400 hover:text-white'
+                    p.isBanned
+                      ? 'border border-rose-500/30 bg-rose-950/20 text-rose-400/70 line-through cursor-not-allowed'
+                      : active
+                        ? 'glass-crimson text-white font-bold'
+                        : 'glass-well text-slate-400 hover:text-white'
                   }`}
                 >
                   <span className="truncate">{p.name}</span>
                   <span className="font-mono-tabular ml-2 shrink-0">
-                    {active ? '✓' : ''}
+                    {p.isBanned ? 'БАН' : active ? '✓' : ''}
                   </span>
                 </button>
               );
@@ -382,7 +884,7 @@ export const AdminView: React.FC = () => {
                 `Турнир «${newTitle}» запущен и выведен на экран ТВ!`
               )
             }
-            className="btn-crimson rounded-xl px-6 py-3 text-sm font-extrabold disabled:opacity-40 cursor-pointer"
+            className="btn-crimson w-full sm:w-auto rounded-xl px-6 py-3.5 text-sm font-extrabold disabled:opacity-40 cursor-pointer"
           >
             Раздать боксы и начать турнир ({selectedIds.length} чел.)
           </button>

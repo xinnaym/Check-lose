@@ -43,6 +43,8 @@ export function calculatePointsForPlace(format: TableFormat, place: number): num
   return TEMPLATE_B_POINTS[place] ?? 15;
 }
 
+export type PenaltyType = 'show_cards_500' | 'check_nuts_5min' | 'collusion_1000' | 'tournament_ban';
+
 export interface PlayerRecord {
   id: number;
   name: string;
@@ -52,6 +54,8 @@ export interface PlayerRecord {
   winsCount: number;
   finalTablesCount: number;
   penaltiesCount: number;
+  isBanned: boolean;
+  banReason: string;
   notes: string;
 }
 
@@ -121,7 +125,7 @@ export interface LivePenaltyLog {
   id: string;
   playerId: number;
   playerName: string;
-  type: 'show_cards_500' | 'check_nuts_5min' | 'collusion_1000';
+  type: PenaltyType;
   description: string;
   timestamp: string;
 }
