@@ -683,9 +683,14 @@ async function startServer() {
     });
   }
 
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
+    console.log('\n============================================================');
+    console.log('  ♠  Покерный клуб «Чек это проигрыш» — Сервер запущен!');
+    console.log(`  ➜  Локальный адрес (Local):   http://localhost:${PORT}/`);
+    console.log(`  ➜  Адрес в сети (Network):    http://127.0.0.1:${PORT}/`);
+    console.log(`  ➜  Live-Таймер (WebSocket):   ws://localhost:${PORT}/ws/live`);
+    console.log('============================================================\n');
   });
 }
 

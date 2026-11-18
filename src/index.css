@@ -10,7 +10,7 @@
 
   body {
     font-family: var(--font-sans);
-    background-color: #08090E;
+    background-color: #060608;
     color: #F8FAFC;
     overflow-x: hidden;
   }
@@ -26,7 +26,7 @@
   }
 }
 
-/* Smoky Carbon & All-In Crimson Liquid Glass System (Poker Studio Aesthetic) */
+/* Smoky Obsidian & Club Orange Liquid Glass System (Matched to Official Logo) */
 .glass-panel {
   background: linear-gradient(
     145deg,
@@ -38,7 +38,7 @@
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    0 24px 48px -12px rgba(0, 0, 0, 0.7),
+    0 24px 48px -12px rgba(0, 0, 0, 0.75),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
 }
 
@@ -52,52 +52,52 @@
   -webkit-backdrop-filter: blur(24px) saturate(170%);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow:
-    0 16px 36px -10px rgba(0, 0, 0, 0.55),
+    0 16px 36px -10px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms ease;
 }
 
 .glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(249, 115, 22, 0.35);
 }
 
 .glass-crimson {
   background: linear-gradient(
     135deg,
-    rgba(225, 29, 72, 0.22) 0%,
-    rgba(159, 18, 57, 0.07) 60%,
+    rgba(249, 115, 22, 0.22) 0%,
+    rgba(234, 88, 12, 0.07) 60%,
     rgba(255, 255, 255, 0.04) 100%
   );
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid rgba(244, 63, 94, 0.38);
+  border: 1px solid rgba(251, 146, 60, 0.42);
   box-shadow:
     0 20px 44px -12px rgba(0, 0, 0, 0.7),
-    0 0 36px -10px rgba(225, 29, 72, 0.3),
-    inset 0 1px 0 0 rgba(255, 200, 210, 0.35);
+    0 0 36px -10px rgba(249, 115, 22, 0.3),
+    inset 0 1px 0 0 rgba(255, 224, 190, 0.35);
 }
 
 .glass-well {
-  background: rgba(6, 7, 11, 0.6);
+  background: rgba(5, 5, 8, 0.65);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.65);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
 .btn-crimson {
-  background: linear-gradient(180deg, #F43F5E 0%, #E11D48 60%, #BE123C 100%);
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, #FB923C 0%, #F97316 55%, #EA580C 100%);
+  color: #050507;
+  border: 1px solid rgba(255, 255, 255, 0.32);
   box-shadow:
-    0 10px 24px -6px rgba(225, 29, 72, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    0 10px 24px -6px rgba(249, 115, 22, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), filter 150ms ease;
 }
 
 .btn-crimson:hover {
   transform: translateY(-1px);
-  filter: brightness(1.08);
+  filter: brightness(1.07);
 }
 
 .btn-glass {

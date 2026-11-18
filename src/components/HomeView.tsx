@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
 import { TEMPLATE_A_POINTS, TEMPLATE_B_POINTS } from '../types/poker.ts';
+import { CLUB_LOGO_PATH } from '../App.tsx';
 import { ArrowRight, Play } from 'lucide-react';
 
 interface HomeViewProps {
@@ -24,35 +25,52 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="space-y-14 pb-16">
-      {/* HERO: POKER ROOM IDENTITY & LIVE TABLE WIDGET */}
+      {/* HERO: OFFICIAL CLUB LOGO & LIVE TABLE WIDGET */}
       <section className="glass-panel relative overflow-hidden rounded-3xl p-7 sm:p-10 lg:p-12">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-center">
-          {/* Left 7 Cols */}
+          {/* Left 7 Cols: Official Logo Badge + Headline + Actions */}
           <div className="space-y-6 lg:col-span-7">
-            <div className="flex flex-wrap items-center gap-2.5 text-xs font-medium text-slate-400">
-              <span className="font-semibold text-[#F43F5E]">ТЕХАССКИЙ ХОЛДЕМ</span>
-              <span aria-hidden="true">·</span>
-              <span>Стартовый стек 25 000</span>
-              <span aria-hidden="true">·</span>
-              <span>Без игры на деньги (УК РФ)</span>
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-full border-2 border-[#F97316]/50 bg-black shadow-[0_0_40px_-5px_rgba(249,115,22,0.45)] sm:h-36 sm:w-36">
+                <img
+                  src={CLUB_LOGO_PATH}
+                  alt="Покерный клуб Чек это проигрыш"
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-400">
+                  <span className="font-bold text-[#F97316]">ТЕХАССКИЙ ХОЛДЕМ</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Стек 25 000</span>
+                  <span aria-hidden="true">·</span>
+                  <span>♠ | ♥ | ♦ | ♣</span>
+                </div>
+
+                <h1
+                  className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl"
+                  style={{ textWrap: 'balance' }}
+                >
+                  Чек это{' '}
+                  <span className="inline-block rounded-xl bg-[#F97316] px-3 py-0.5 text-[#060608]">
+                    проигрыш
+                  </span>
+                </h1>
+              </div>
             </div>
 
-            <h1
-              className="font-display text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl"
-              style={{ textWrap: 'balance' }}
-            >
-              Покерный клуб «Чек это проигрыш»
-            </h1>
-
             <p className="max-w-xl text-base leading-relaxed text-slate-300">
-              Клуб спортивного покера и живого общения. Каждый вечер играем 2–3 рейтинговых турнира,
-              ведём сезонный отбор в Топ-10 за Финальный стол и жёстко наказываем за чек с натсом на ривере.
+              Интеллектуальный покерный клуб спортивного Техасского Холдема. Каждый вечер проводим
+              2–3 рейтинговых турнира, ведём двухмесячный отбор в Топ-10 за Финальный стол и
+              удаляем на 5 минут за чек с натсом.
             </p>
 
             <div className="flex flex-wrap items-center gap-3.5 pt-1">
               <button
                 onClick={() => onNavigate('live')}
-                className="btn-crimson inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold whitespace-nowrap shrink-0 cursor-pointer"
+                className="btn-crimson inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-extrabold whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <span>Экран турнира (ТВ 16:9)</span>
                 <ArrowRight className="h-4 w-4" />
@@ -62,7 +80,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
                 onClick={() => onNavigate('admin')}
                 className="btn-glass inline-flex items-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold text-white whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Play className="h-4 w-4 text-[#F43F5E]" />
+                <Play className="h-4 w-4 text-[#F97316]" />
                 <span>Пульт дилера</span>
               </button>
 
@@ -75,36 +93,26 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Right 5 Cols: Pocket Aces Visual + Live Table Status */}
+          {/* Right 5 Cols: Live Table Status */}
           <div className="lg:col-span-5">
             <div className="glass-well rounded-2xl p-6">
               <div className="flex items-center justify-between border-b border-white/10 pb-5">
-                <div className="flex items-center gap-4">
-                  {/* Overlapping Pocket Aces Graphic (A♠ A♥) */}
-                  <div className="relative flex h-14 w-16 shrink-0 items-center">
-                    <div className="flex h-13 w-10 -rotate-6 flex-col justify-between rounded-lg border border-white/25 bg-[#141722] p-1.5 shadow-lg">
-                      <span className="font-mono-tabular text-xs font-bold leading-none text-white">
-                        A♠
-                      </span>
-                      <span className="self-center text-base leading-none text-white">♠</span>
-                    </div>
-                    <div className="absolute left-5 flex h-13 w-10 rotate-6 flex-col justify-between rounded-lg border border-[#F43F5E]/50 bg-[#1B1218] p-1.5 shadow-xl">
-                      <span className="font-mono-tabular text-xs font-bold leading-none text-[#F43F5E]">
-                        A♥
-                      </span>
-                      <span className="self-center text-base leading-none text-[#F43F5E]">♥</span>
-                    </div>
-                  </div>
-
+                <div className="flex items-center gap-3.5">
+                  <img
+                    src={CLUB_LOGO_PATH}
+                    alt="Логотип клуба"
+                    className="h-12 w-12 shrink-0 rounded-full border border-[#F97316]/40 object-cover"
+                    referrerPolicy="no-referrer"
+                  />
                   <div>
-                    <div className="text-xs text-slate-400">Сейчас за столом</div>
+                    <div className="text-xs text-slate-400">Сейчас за столом в зале</div>
                     <div className="font-display text-base font-bold text-white">
                       {liveState?.tournamentTitle || 'Вечерний Холдем'}
                     </div>
                   </div>
                 </div>
 
-                <span className="text-xs font-bold text-[#F43F5E]">
+                <span className="text-xs font-extrabold text-[#F97316]">
                   {liveState?.status === 'running'
                     ? 'ИДЁТ ИГРА'
                     : liveState?.status === 'completed'
@@ -124,7 +132,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
                     </div>
                     <div>
                       <div className="text-xs text-slate-400">Текущие блайнды</div>
-                      <div className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#F43F5E] sm:text-3xl">
+                      <div className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#F97316] sm:text-3xl">
                         {currentLevel?.isBreak
                           ? 'ПЕРЕРЫВ'
                           : `${currentLevel?.smallBlind.toLocaleString('ru-RU')}/${currentLevel?.bigBlind.toLocaleString('ru-RU')}`}
@@ -174,7 +182,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>Игра #{idx + 1}</span>
-                  <span className="font-mono-tabular font-bold text-[#F43F5E]">
+                  <span className="font-mono-tabular font-bold text-[#F97316]">
                     {item.eventDate}
                   </span>
                 </div>
@@ -193,7 +201,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* RULES, PENALTIES & POINTS TABLE IN ONE CLEAN SPLIT */}
+      {/* RULES, PENALTIES & POINTS TABLE */}
       <section className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Left 7 Cols: Club Rules & Penalties */}
         <div className="glass-panel space-y-6 rounded-3xl p-6 sm:p-8 lg:col-span-7">
@@ -220,7 +228,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             </div>
 
             <div className="glass-crimson rounded-2xl p-4">
-              <div className="font-mono-tabular text-xl font-extrabold text-[#F43F5E]">
+              <div className="font-mono-tabular text-xl font-extrabold text-[#F97316]">
                 Бан 5 минут
               </div>
               <div className="mt-1 text-sm font-bold text-white">
@@ -266,7 +274,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             <div className="glass-well flex items-center gap-1 rounded-xl p-1">
               <button
                 onClick={() => setSelectedTemplate('1_table')}
-                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   selectedTemplate === '1_table'
                     ? 'btn-crimson'
                     : 'text-slate-400 hover:text-white'
@@ -276,7 +284,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
               </button>
               <button
                 onClick={() => setSelectedTemplate('2_tables')}
-                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   selectedTemplate === '2_tables'
                     ? 'btn-crimson'
                     : 'text-slate-400 hover:text-white'

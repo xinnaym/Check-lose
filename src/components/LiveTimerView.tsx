@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
 import { calculatePointsForPlace } from '../types/poker.ts';
+import { CLUB_LOGO_PATH } from '../App.tsx';
 import { Maximize2, Minimize2, Sliders } from 'lucide-react';
 
 interface LiveTimerViewProps {
@@ -81,9 +82,15 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Broadcast Bar */}
+      {/* Top Broadcast Bar with Club Logo */}
       <div className="glass-panel flex flex-wrap items-center justify-between gap-4 rounded-2xl px-6 py-3.5">
-        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center gap-3.5 text-xs text-slate-400">
+          <img
+            src={CLUB_LOGO_PATH}
+            alt="Чек это проигрыш"
+            className="h-9 w-9 rounded-full border border-[#F97316]/50 object-cover"
+            referrerPolicy="no-referrer"
+          />
           <span className="font-display text-sm font-bold text-white">
             {liveState.tournamentTitle}
           </span>
@@ -107,13 +114,13 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
             onClick={onOpenAdmin}
             className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Sliders className="h-3.5 w-3.5 text-[#F43F5E]" />
+            <Sliders className="h-3.5 w-3.5 text-[#F97316]" />
             <span>Пульт дилера</span>
           </button>
 
           <button
             onClick={toggleFullscreen}
-            className="btn-crimson inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer"
+            className="btn-crimson inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer"
           >
             {isFullscreen ? (
               <>
@@ -133,7 +140,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
       {/* Color-Up Break Notification */}
       {(currentLevel.isBreak || nextLevel?.isBreak) && (
         <div className="glass-crimson rounded-2xl px-6 py-4 text-center">
-          <div className="text-xs font-bold tracking-wider text-rose-300">
+          <div className="text-xs font-bold tracking-wider text-orange-300">
             ПЕРЕРЫВ В ИГРЕ · УКРУПНЕНИЕ ФИШЕК (COLOR-UP)
           </div>
           <div className="font-display mt-1 text-lg font-bold text-white">
@@ -149,12 +156,20 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
         {/* LEFT 7 COLS: CLOCK & BLINDS */}
         <div className="glass-panel flex flex-col justify-between rounded-3xl p-6 sm:p-10 lg:col-span-7">
           <div className="flex items-center justify-between border-b border-white/10 pb-5">
-            <div>
-              <div className="text-xs text-slate-400">Текущий уровень</div>
-              <div className="font-display mt-0.5 text-2xl font-extrabold text-white sm:text-3xl">
-                {currentLevel.isBreak
-                  ? 'Перерыв'
-                  : `Уровень #${currentLevel.levelNumber ?? liveState.currentLevelIndex + 1}`}
+            <div className="flex items-center gap-4">
+              <img
+                src={CLUB_LOGO_PATH}
+                alt="Покерный клуб Чек это проигрыш"
+                className="h-14 w-14 rounded-full border border-[#F97316]/50 object-cover shadow-lg"
+                referrerPolicy="no-referrer"
+              />
+              <div>
+                <div className="text-xs text-slate-400">Текущий уровень</div>
+                <div className="font-display mt-0.5 text-2xl font-extrabold text-white sm:text-3xl">
+                  {currentLevel.isBreak
+                    ? 'Перерыв'
+                    : `Уровень #${currentLevel.levelNumber ?? liveState.currentLevelIndex + 1}`}
+                </div>
               </div>
             </div>
 
@@ -165,7 +180,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
                   liveState.status === 'running'
                     ? 'text-emerald-400'
                     : liveState.status === 'completed'
-                      ? 'text-[#F43F5E]'
+                      ? 'text-[#F97316]'
                       : 'text-amber-400'
                 }`}
               >
@@ -185,7 +200,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
             </div>
             <div
               className={`font-mono-tabular mt-2 text-7xl font-extrabold tracking-tight sm:text-8xl xl:text-9xl ${
-                isLowTime ? 'text-[#F43F5E]' : 'text-white'
+                isLowTime ? 'text-[#F97316]' : 'text-white'
               }`}
             >
               {formatClock(liveState.remainingSeconds)}
@@ -193,7 +208,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
 
             <div className="glass-well mx-auto mt-6 h-2.5 w-full max-w-xl overflow-hidden rounded-full">
               <div
-                className="h-full bg-gradient-to-r from-[#E11D48] to-[#FB7185] transition-all duration-300"
+                className="h-full bg-gradient-to-r from-[#EA580C] to-[#FB923C] transition-all duration-300"
                 style={{ width: `${progressPct}%` }}
               />
             </div>
@@ -202,13 +217,13 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
           {/* Current & Next Blinds */}
           <div className="grid grid-cols-1 gap-4 border-t border-white/10 pt-6 sm:grid-cols-2">
             <div className="glass-crimson rounded-2xl p-5">
-              <div className="text-xs font-bold text-rose-200">ТЕКУЩИЕ БЛАЙНДЫ</div>
+              <div className="text-xs font-bold text-orange-200">ТЕКУЩИЕ БЛАЙНДЫ</div>
               <div className="font-mono-tabular mt-2 text-3xl font-extrabold text-white sm:text-4xl">
                 {currentLevel.isBreak
                   ? 'ПЕРЕРЫВ'
                   : `${currentLevel.smallBlind.toLocaleString('ru-RU')} / ${currentLevel.bigBlind.toLocaleString('ru-RU')}`}
               </div>
-              <div className="font-mono-tabular mt-1.5 text-xs text-rose-100/80">
+              <div className="font-mono-tabular mt-1.5 text-xs text-orange-100/80">
                 {currentLevel.ante > 0
                   ? `Анте: ${currentLevel.ante.toLocaleString('ru-RU')}`
                   : 'Без анте'}
@@ -255,7 +270,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
             </div>
             <div>
               <div className="text-xs text-slate-400">Следующий вылет</div>
-              <div className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#F43F5E]">
+              <div className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#F97316]">
                 {nextEliminationPlace > 0
                   ? `#${nextEliminationPlace} (+${nextEliminationPoints})`
                   : 'Финал'}
@@ -273,7 +288,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
                 <h2 className="font-display text-xl font-bold text-white">Лента выбывших</h2>
                 <p className="text-xs text-slate-400">Место и очки в реальном времени</p>
               </div>
-              <span className="font-mono-tabular text-xs font-bold text-[#F43F5E]">
+              <span className="font-mono-tabular text-xs font-bold text-[#F97316]">
                 Выбыло: {liveState.eliminatedPlayers.length}
               </span>
             </div>
@@ -292,7 +307,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
                     }`}
                   >
                     <div className="flex items-center gap-3.5">
-                      <div className="font-mono-tabular text-lg font-extrabold text-[#F43F5E]">
+                      <div className="font-mono-tabular text-lg font-extrabold text-[#F97316]">
                         #{entry.place}
                       </div>
                       <div>
@@ -336,7 +351,7 @@ export const LiveTimerView: React.FC<LiveTimerViewProps> = ({ onOpenAdmin }) => 
                   <span
                     className={`font-mono-tabular shrink-0 text-xs font-extrabold ${
                       player.drawnCard.includes('♥') || player.drawnCard.includes('♦')
-                        ? 'text-[#F43F5E]'
+                        ? 'text-[#F97316]'
                         : 'text-slate-300'
                     }`}
                   >

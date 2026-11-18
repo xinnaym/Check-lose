@@ -42,7 +42,7 @@ export const LeaderboardView: React.FC = () => {
       {/* Header */}
       <div className="glass-panel flex flex-col justify-between gap-6 rounded-3xl p-6 sm:p-8 lg:flex-row lg:items-center">
         <div className="space-y-1.5">
-          <div className="text-xs font-semibold text-[#F43F5E]">
+          <div className="text-xs font-bold text-[#F97316]">
             СЕЗОННЫЙ РЕЙТИНГ (2 МЕСЯЦА) · ОТБОР В ТОП-10
           </div>
           <h1 className="font-display text-3xl font-extrabold text-white sm:text-4xl">
@@ -61,7 +61,7 @@ export const LeaderboardView: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Найти игрока..."
-              className="glass-well w-full rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-400 focus:border-[#F43F5E] focus:outline-none"
+              className="glass-well w-full rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-400 focus:border-[#F97316] focus:outline-none"
             />
           </div>
 
@@ -69,7 +69,7 @@ export const LeaderboardView: React.FC = () => {
             onClick={() => setShowAddForm(!showAddForm)}
             className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-white whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Plus className="h-4 w-4 text-[#F43F5E]" />
+            <Plus className="h-4 w-4 text-[#F97316]" />
             <span>Новый игрок</span>
           </button>
         </div>
@@ -96,7 +96,7 @@ export const LeaderboardView: React.FC = () => {
           />
           <button
             type="submit"
-            className="btn-crimson rounded-xl px-5 py-2.5 text-xs font-bold cursor-pointer"
+            className="btn-crimson rounded-xl px-5 py-2.5 text-xs font-extrabold cursor-pointer"
           >
             Добавить в клуб
           </button>
@@ -132,7 +132,7 @@ export const LeaderboardView: React.FC = () => {
                         <span
                           className={
                             player.rank <= 3
-                              ? 'text-[#F43F5E] text-base'
+                              ? 'text-[#F97316] text-base'
                               : player.inFinalTable
                                 ? 'text-white'
                                 : 'text-slate-500'
@@ -166,7 +166,7 @@ export const LeaderboardView: React.FC = () => {
                         {player.inFinalTable ? (
                           <span className="text-emerald-400">+{player.deltaToCutoff}</span>
                         ) : (
-                          <span className="text-rose-400">−{player.deltaToCutoff}</span>
+                          <span className="text-orange-400">−{player.deltaToCutoff}</span>
                         )}
                       </td>
                       <td className="font-mono-tabular py-4 pl-3 pr-6 text-right text-base font-extrabold text-white">
@@ -175,10 +175,10 @@ export const LeaderboardView: React.FC = () => {
                     </tr>
 
                     {isCutoffRow && (
-                      <tr className="bg-[#E11D48]/15">
+                      <tr className="bg-[#F97316]/15">
                         <td
                           colSpan={7}
-                          className="py-2.5 px-6 text-center text-xs font-bold tracking-wider text-[#F43F5E]"
+                          className="py-2.5 px-6 text-center text-xs font-bold tracking-wider text-[#F97316]"
                         >
                           ↑ ЗОНА ПОПАДАНИЯ ЗА «ФИНАЛЬНЫЙ СТОЛ СЕЗОНА» (ТОП-10) ↑
                         </td>

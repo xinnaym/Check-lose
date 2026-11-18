@@ -29,7 +29,6 @@ export const AdminView: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // New game setup state
   const [newTitle, setNewTitle] = useState('Вечерний Холдем • Турнир #2');
   const [newFormat, setNewFormat] = useState<TableFormat>('1_table');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -106,7 +105,7 @@ export const AdminView: React.FC = () => {
       <div className="glass-panel rounded-3xl p-6 sm:p-8">
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
           <div>
-            <div className="text-xs font-bold text-[#F43F5E]">
+            <div className="text-xs font-bold text-[#F97316]">
               ПУЛЬТ ДИЛЕРА · МГНОВЕННАЯ СИНХРОНИЗАЦИЯ С ТВ
             </div>
             <h1 className="font-display mt-1 text-2xl font-extrabold text-white sm:text-3xl">
@@ -198,7 +197,7 @@ export const AdminView: React.FC = () => {
               }
               className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-white cursor-pointer"
             >
-              <Shuffle className="h-3.5 w-3.5 text-[#F43F5E]" />
+              <Shuffle className="h-3.5 w-3.5 text-[#F97316]" />
               <span>Раздать боксы (A–10)</span>
             </button>
 
@@ -227,7 +226,7 @@ export const AdminView: React.FC = () => {
                 <div
                   className={`font-mono-tabular flex h-10 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/40 text-xs font-extrabold ${
                     player.drawnCard.includes('♥') || player.drawnCard.includes('♦')
-                      ? 'text-[#F43F5E]'
+                      ? 'text-[#F97316]'
                       : 'text-white'
                   }`}
                 >
@@ -249,7 +248,7 @@ export const AdminView: React.FC = () => {
                     `${player.name} — #${nextElimPlace} место (+${nextElimPoints} очк.)`
                   )
                 }
-                className="btn-crimson inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer"
+                className="btn-crimson inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <UserMinus className="h-3.5 w-3.5" />
                 <span>
@@ -291,7 +290,7 @@ export const AdminView: React.FC = () => {
               type="submit"
               className="btn-glass inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-white whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5 text-[#F43F5E]" />
+              <Plus className="h-3.5 w-3.5 text-[#F97316]" />
               <span>В список</span>
             </button>
           </form>
@@ -317,7 +316,7 @@ export const AdminView: React.FC = () => {
                   setNewFormat('1_table');
                   setSelectedIds(players.slice(0, 10).map((p) => p.id));
                 }}
-                className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
                   newFormat === '1_table' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -329,7 +328,7 @@ export const AdminView: React.FC = () => {
                   setNewFormat('2_tables');
                   setSelectedIds(players.slice(0, 16).map((p) => p.id));
                 }}
-                className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
                   newFormat === '2_tables' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -383,7 +382,7 @@ export const AdminView: React.FC = () => {
                 `Турнир «${newTitle}» запущен и выведен на экран ТВ!`
               )
             }
-            className="btn-crimson rounded-xl px-6 py-3 text-sm font-bold disabled:opacity-40 cursor-pointer"
+            className="btn-crimson rounded-xl px-6 py-3 text-sm font-extrabold disabled:opacity-40 cursor-pointer"
           >
             Раздать боксы и начать турнир ({selectedIds.length} чел.)
           </button>
