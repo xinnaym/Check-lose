@@ -5,13 +5,9 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
 import * as dotenv from 'dotenv';
-import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
-import { getOrCreateUser } from './src/db/users.ts';
 import {
   awardPlayerTournamentPoints,
-  createAnnouncement,
   createPlayer,
-  deleteAnnouncement,
   deletePlayer,
   getAllAnnouncements,
   getAllArchivedTournaments,
@@ -22,9 +18,7 @@ import {
   replaceAllBlindLevels,
   saveArchivedTournament,
   saveLiveStateSnapshot,
-  updateAnnouncement,
   updatePlayer,
-  upsertClubContent,
 } from './src/db/repository.ts';
 import {
   ActiveTournamentPlayer,
@@ -45,16 +39,16 @@ const DEFAULT_BLIND_LEVELS: BlindLevelRecord[] = [
   { id: 2, levelOrder: 2, levelNumber: 2, isBreak: false, breakTitle: '', smallBlind: 200, bigBlind: 400, ante: 0, durationSeconds: 600 },
   { id: 3, levelOrder: 3, levelNumber: 3, isBreak: false, breakTitle: '', smallBlind: 300, bigBlind: 600, ante: 0, durationSeconds: 600 },
   { id: 4, levelOrder: 4, levelNumber: 4, isBreak: false, breakTitle: '', smallBlind: 400, bigBlind: 800, ante: 800, durationSeconds: 600 },
-  { id: 5, levelOrder: 5, levelNumber: null, isBreak: true, breakTitle: 'Перерыв • Укрупнение фишек номиналом 100', smallBlind: 0, bigBlind: 0, ante: 0, durationSeconds: 600 },
+  { id: 5, levelOrder: 5, levelNumber: null, isBreak: true, breakTitle: 'Перерыв 10 мин • Укрупнение фишек номиналом 100', smallBlind: 0, bigBlind: 0, ante: 0, durationSeconds: 600 },
   { id: 6, levelOrder: 6, levelNumber: 5, isBreak: false, breakTitle: '', smallBlind: 500, bigBlind: 1000, ante: 1000, durationSeconds: 600 },
   { id: 7, levelOrder: 7, levelNumber: 6, isBreak: false, breakTitle: '', smallBlind: 1000, bigBlind: 2000, ante: 2000, durationSeconds: 600 },
   { id: 8, levelOrder: 8, levelNumber: 7, isBreak: false, breakTitle: '', smallBlind: 1500, bigBlind: 3000, ante: 3000, durationSeconds: 600 },
   { id: 9, levelOrder: 9, levelNumber: 8, isBreak: false, breakTitle: '', smallBlind: 2000, bigBlind: 4000, ante: 4000, durationSeconds: 600 },
-  { id: 10, levelOrder: 10, levelNumber: null, isBreak: true, breakTitle: 'Перерыв • Укрупнение фишек номиналом 500', smallBlind: 0, bigBlind: 0, ante: 0, durationSeconds: 300 },
+  { id: 10, levelOrder: 10, levelNumber: null, isBreak: true, breakTitle: 'Перерыв 5 мин • Укрупнение фишек номиналом 500', smallBlind: 0, bigBlind: 0, ante: 0, durationSeconds: 300 },
   { id: 11, levelOrder: 11, levelNumber: 9, isBreak: false, breakTitle: '', smallBlind: 3000, bigBlind: 6000, ante: 6000, durationSeconds: 600 },
   { id: 12, levelOrder: 12, levelNumber: 10, isBreak: false, breakTitle: '', smallBlind: 5000, bigBlind: 10000, ante: 10000, durationSeconds: 600 },
   { id: 13, levelOrder: 13, levelNumber: 11, isBreak: false, breakTitle: '', smallBlind: 10000, bigBlind: 20000, ante: 20000, durationSeconds: 600 },
-  { id: 14, levelOrder: 14, levelNumber: null, isBreak: true, breakTitle: 'Перерыв • Укрупнение фишек номиналом 1000', smallBlind: 0, bigBlind: 0, ante: 0, durationSeconds: 300 },
+  { id: 14, levelOrder: 14, levelNumber: null, isBreak: true, breakTitle: 'Перерыв 5 мин • Укрупнение фишек номиналом 1000', smallBlind: 0, bigBlind: 0, ante: 0, durationSeconds: 300 },
   { id: 15, levelOrder: 15, levelNumber: 12, isBreak: false, breakTitle: '', smallBlind: 15000, bigBlind: 30000, ante: 30000, durationSeconds: 600 },
   { id: 16, levelOrder: 16, levelNumber: 13, isBreak: false, breakTitle: '', smallBlind: 25000, bigBlind: 50000, ante: 50000, durationSeconds: 600 },
   { id: 17, levelOrder: 17, levelNumber: 14, isBreak: false, breakTitle: '', smallBlind: 40000, bigBlind: 50000, ante: 50000, durationSeconds: 600 },
@@ -63,7 +57,7 @@ const DEFAULT_BLIND_LEVELS: BlindLevelRecord[] = [
 let cachedBlindLevels: BlindLevelRecord[] = [...DEFAULT_BLIND_LEVELS];
 
 let liveState: LiveTournamentState = {
-  tournamentTitle: 'Вечерняя Серия • Главное Событие',
+  tournamentTitle: 'Вечерний Холдем • Турнир #1',
   tableFormat: '1_table',
   startingStack: 25000,
   status: 'paused',
@@ -142,14 +136,13 @@ async function startServer() {
     );
   });
 
-  // In-memory 1-second authoritative tournament clock (does NOT hit the DB on ticks)
+  // 1-second authoritative tournament clock
   setInterval(() => {
     if (liveState.status === 'running') {
       if (liveState.remainingSeconds > 0) {
         liveState.remainingSeconds -= 1;
         liveState.lastUpdated = Date.now();
       } else {
-        // Advance to next level automatically
         if (liveState.currentLevelIndex < cachedBlindLevels.length - 1) {
           liveState.currentLevelIndex += 1;
           const nextLvl = cachedBlindLevels[liveState.currentLevelIndex];
@@ -169,10 +162,6 @@ async function startServer() {
       });
     }
   }, 1000);
-
-  // ============================================================================
-  // PUBLIC READ ENDPOINTS (For Club Visitors, Mobile Players & Hall TV Display)
-  // ============================================================================
 
   app.get('/api/bootstrap', async (_req, res) => {
     try {
@@ -207,27 +196,10 @@ async function startServer() {
     }
   });
 
-  // ============================================================================
-  // AUTHENTICATED ADMIN & DEALER ENDPOINTS (Protected by Firebase Auth)
-  // ============================================================================
+  // --- Direct Dealer & Tournament Controls (Zero Auth Friction) ---
 
-  app.post('/api/auth/sync', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/admin/live/start-tournament', async (req, res) => {
     try {
-      const uid = req.user!.uid;
-      const email = req.user!.email || 'dealer@checkisloss.club';
-      const dbUser = await getOrCreateUser(uid, email);
-      res.json({ user: dbUser });
-    } catch (error: any) {
-      console.error('Failed to sync authenticated user:', error);
-      res.status(500).json({ error: error.message || 'Не удалось синхронизировать профиль администратора' });
-    }
-  });
-
-  // --- Live Tournament Timer Controls ---
-
-  app.post('/api/admin/live/start-tournament', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      await getOrCreateUser(req.user!.uid, req.user!.email || 'dealer@checkisloss.club');
       const {
         tournamentTitle,
         tableFormat,
@@ -253,7 +225,6 @@ async function startServer() {
         return res.status(400).json({ error: 'Выберите минимум 2 игроков для старта турнира' });
       }
 
-      // Shuffle players if random seating generator is enabled
       const ordered = [...chosenPlayers];
       if (useRandomSeating !== false) {
         for (let i = ordered.length - 1; i > 0; i--) {
@@ -275,7 +246,6 @@ async function startServer() {
             drawnCard,
           };
         } else {
-          // Split evenly across 2 tables
           const tableNumber = idx % 2 === 0 ? 1 : 2;
           const seatNumber = Math.floor(idx / 2) + 1;
           const cardPool = tableNumber === 1 ? TABLE_1_CARDS : TABLE_2_CARDS;
@@ -294,7 +264,7 @@ async function startServer() {
       const firstLevel = cachedBlindLevels[0] || DEFAULT_BLIND_LEVELS[0];
 
       liveState = {
-        tournamentTitle: (tournamentTitle || 'Вечерний Рейтинговый Турнир').trim(),
+        tournamentTitle: (tournamentTitle || 'Вечерний Холдем').trim(),
         tableFormat: tableFormat === '2_tables' ? '2_tables' : '1_table',
         startingStack: Number(startingStack) || 25000,
         status: 'paused',
@@ -321,7 +291,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/live/control', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/admin/live/control', async (req, res) => {
     try {
       const { action } = req.body as {
         action: 'start' | 'pause' | 'next_level' | 'prev_level' | 'reset_level' | 'add_minute';
@@ -375,7 +345,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/live/reseat', requireAuth, async (_req: AuthRequest, res) => {
+  app.post('/api/admin/live/reseat', async (_req, res) => {
     try {
       const shuffled = [...liveState.activePlayers];
       for (let i = shuffled.length - 1; i > 0; i--) {
@@ -421,15 +391,13 @@ async function startServer() {
     }
   });
 
-  // Ключевая функция ТЗ: Фиксация выбывания с автоматическим расчетом места и очков
-  app.post('/api/admin/live/eliminate', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/admin/live/eliminate', async (req, res) => {
     try {
-      await getOrCreateUser(req.user!.uid, req.user!.email || 'dealer@checkisloss.club');
       const { playerId } = req.body as { playerId: number };
 
       const targetIndex = liveState.activePlayers.findIndex((p) => p.playerId === playerId);
       if (targetIndex === -1) {
-        return res.status(404).json({ error: 'Игрок не найден среди активных участников за столом' });
+        return res.status(404).json({ error: 'Игрок не найден за столом' });
       }
 
       const eliminatedPlayer = liveState.activePlayers[targetIndex];
@@ -438,10 +406,8 @@ async function startServer() {
       const levelDesc = getCurrentLevelDescription();
       const nowTime = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
-      // Remove from active players
       liveState.activePlayers.splice(targetIndex, 1);
 
-      // Prepend to eliminated list
       liveState.eliminatedPlayers.unshift({
         place: currentPlace,
         playerId: eliminatedPlayer.playerId,
@@ -452,10 +418,8 @@ async function startServer() {
         timestamp: nowTime,
       });
 
-      // Persist points to PostgreSQL seasonal leaderboard
       await awardPlayerTournamentPoints(eliminatedPlayer.playerId, pointsAwarded, currentPlace, false);
 
-      // If only 1 player remains, automatically crown the Winner (1st place) and archive tournament
       if (liveState.activePlayers.length === 1) {
         const winner = liveState.activePlayers[0];
         const firstPlacePoints = calculatePointsForPlace(liveState.tableFormat, 1);
@@ -489,7 +453,6 @@ async function startServer() {
           totalPlayers: liveState.totalInitialPlayers,
           winnerName: winner.name,
           results: liveState.eliminatedPlayers,
-          createdByUid: req.user!.uid,
         });
       }
 
@@ -521,14 +484,12 @@ async function startServer() {
     }
   });
 
-  // Отмена последнего выбывания (на случай случайного нажатия дилером)
-  app.post('/api/admin/live/undo-eliminate', requireAuth, async (_req: AuthRequest, res) => {
+  app.post('/api/admin/live/undo-eliminate', async (_req, res) => {
     try {
       if (liveState.eliminatedPlayers.length === 0) {
         return res.status(400).json({ error: 'Список выбывших пуст' });
       }
 
-      // If tournament just completed (1st and 2nd recorded together), undo both 1st and 2nd
       const topEntry = liveState.eliminatedPlayers[0];
       if (topEntry.place === 1 && liveState.eliminatedPlayers.length >= 2) {
         const winnerEntry = liveState.eliminatedPlayers.shift()!;
@@ -605,8 +566,7 @@ async function startServer() {
     }
   });
 
-  // Вынесение дисциплинарного штрафа за столом (ТЗ п.2)
-  app.post('/api/admin/live/penalty', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/admin/live/penalty', async (req, res) => {
     try {
       const { playerId, penaltyType } = req.body as {
         playerId: number;
@@ -615,13 +575,13 @@ async function startServer() {
 
       const target = liveState.activePlayers.find((p) => p.playerId === playerId);
       if (!target) {
-        return res.status(404).json({ error: 'Игрок не найден за активным столом' });
+        return res.status(404).json({ error: 'Игрок не найден за столом' });
       }
 
       const penaltyDescriptions: Record<typeof penaltyType, string> = {
         show_cards_500: 'Штраф 500 фишек • Показ карт до конца раздачи',
-        check_nuts_5min: 'Удаление на 5 минут • «Чек» с натсом на ривере',
-        collusion_1000: 'Штраф 1 000 фишек • Командная игра / сговор',
+        check_nuts_5min: 'Удаление на 5 минут • «Чек» с натсом',
+        collusion_1000: 'Штраф 1 000 фишек • Сговор',
       };
 
       const logItem: LivePenaltyLog = {
@@ -659,9 +619,7 @@ async function startServer() {
     }
   });
 
-  // --- CMS: Players Management ---
-
-  app.post('/api/admin/players', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/admin/players', async (req, res) => {
     try {
       const created = await createPlayer(req.body);
       const playersList = await getAllPlayersOrdered();
@@ -672,7 +630,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/admin/players/:id', requireAuth, async (req: AuthRequest, res) => {
+  app.put('/api/admin/players/:id', async (req, res) => {
     try {
       const id = Number(req.params.id);
       const updated = await updatePlayer(id, req.body);
@@ -680,11 +638,11 @@ async function startServer() {
       broadcast({ type: 'data:refresh', payload: { players: playersList } });
       res.json({ player: updated, players: playersList });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Ошибка обновления профиля игрока' });
+      res.status(500).json({ error: error.message || 'Ошибка обновления игрока' });
     }
   });
 
-  app.delete('/api/admin/players/:id', requireAuth, async (req: AuthRequest, res) => {
+  app.delete('/api/admin/players/:id', async (req, res) => {
     try {
       const id = Number(req.params.id);
       await deletePlayer(id);
@@ -696,60 +654,7 @@ async function startServer() {
     }
   });
 
-  // --- CMS: Announcements Management ---
-
-  app.post('/api/admin/announcements', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      await createAnnouncement(req.body);
-      const announcementsList = await getAllAnnouncements();
-      broadcast({ type: 'data:refresh', payload: { announcements: announcementsList } });
-      res.json({ announcements: announcementsList });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Ошибка создания анонса' });
-    }
-  });
-
-  app.put('/api/admin/announcements/:id', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const id = Number(req.params.id);
-      await updateAnnouncement(id, req.body);
-      const announcementsList = await getAllAnnouncements();
-      broadcast({ type: 'data:refresh', payload: { announcements: announcementsList } });
-      res.json({ announcements: announcementsList });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Ошибка обновления анонса' });
-    }
-  });
-
-  app.delete('/api/admin/announcements/:id', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const id = Number(req.params.id);
-      await deleteAnnouncement(id);
-      const announcementsList = await getAllAnnouncements();
-      broadcast({ type: 'data:refresh', payload: { announcements: announcementsList } });
-      res.json({ announcements: announcementsList });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Ошибка удаления анонса' });
-    }
-  });
-
-  // --- CMS: Club Rules & Content Management ---
-
-  app.put('/api/admin/content', requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const { key, title, content } = req.body as { key: string; title: string; content: string };
-      await upsertClubContent(key, title, content);
-      const contentList = await getAllClubContent();
-      broadcast({ type: 'data:refresh', payload: { clubContent: contentList } });
-      res.json({ clubContent: contentList });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Ошибка обновления контента правил' });
-    }
-  });
-
-  // --- CMS: Blind Structure Management ---
-
-  app.put('/api/admin/blinds', requireAuth, async (req: AuthRequest, res) => {
+  app.put('/api/admin/blinds', async (req, res) => {
     try {
       const { levels } = req.body as { levels: Omit<BlindLevelRecord, 'id'>[] };
       const updated = await replaceAllBlindLevels(levels);
@@ -760,11 +665,10 @@ async function startServer() {
       });
       res.json({ blindLevels: cachedBlindLevels });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Ошибка сохранения структуры блайндов' });
+      res.status(500).json({ error: error.message || 'Ошибка сохранения блайндов' });
     }
   });
 
-  // Vite middleware for dev, or static files in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

@@ -1,21 +1,14 @@
 import React, { useState } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
 import { TEMPLATE_A_POINTS, TEMPLATE_B_POINTS } from '../types/poker.ts';
-import { ArrowRight, Trophy, Clock, Users, ShieldCheck, Calendar } from 'lucide-react';
+import { ArrowRight, Play } from 'lucide-react';
 
 interface HomeViewProps {
-  onNavigate: (tab: 'home' | 'leaderboard' | 'rules' | 'archive' | 'live' | 'admin') => void;
+  onNavigate: (tab: 'home' | 'leaderboard' | 'live' | 'admin') => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
-  const {
-    players,
-    announcements,
-    blindLevels,
-    liveState,
-    getContentByKey,
-  } = useClub();
-
+  const { announcements, blindLevels, liveState } = useClub();
   const [selectedTemplate, setSelectedTemplate] = useState<'1_table' | '2_tables'>('1_table');
 
   const currentLevel =
@@ -29,402 +22,297 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const clubAbout = getContentByKey(
-    'club_about',
-    'Интеллектуальное пространство для ценителей спортивного Техасского Холдема, живого общения и турнирной стратегии.'
-  );
-  const seasonInfo = getContentByKey(
-    'season_info',
-    'Длительность сезона составляет 2 месяца. Топ-10 игроков сезона выходят за Финальный стол.'
-  );
-
-  const topFivePlayers = players.slice(0, 5);
-  const tenthPlacePoints = players[9]?.seasonPoints ?? 560;
-
   return (
-    <div className="space-y-16 pb-16">
-      {/* HERO SECTION */}
-      <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#121917] p-8 md:p-12 lg:p-16">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-25"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 80% 20%, rgba(212, 175, 55, 0.22), transparent 55%), radial-gradient(circle at 15% 85%, rgba(16, 185, 129, 0.14), transparent 50%)',
-          }}
-        />
-
-        <div className="relative z-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-center">
+    <div className="space-y-14 pb-16">
+      {/* HERO: POKER ROOM IDENTITY & LIVE TABLE WIDGET */}
+      <section className="glass-panel relative overflow-hidden rounded-3xl p-7 sm:p-10 lg:p-12">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-center">
+          {/* Left 7 Cols */}
           <div className="space-y-6 lg:col-span-7">
-            <div className="flex flex-wrap items-center gap-2 text-xs tracking-wide text-[#94A39E]">
-              <span>Спортивный Техасский Холдем</span>
+            <div className="flex flex-wrap items-center gap-2.5 text-xs font-medium text-slate-400">
+              <span className="font-semibold text-[#F43F5E]">ТЕХАССКИЙ ХОЛДЕМ</span>
               <span aria-hidden="true">·</span>
-              <span>Сезон 2 месяца</span>
+              <span>Стартовый стек 25 000</span>
               <span aria-hidden="true">·</span>
-              <span>Исключительно без игры на деньги (УК РФ)</span>
+              <span>Без игры на деньги (УК РФ)</span>
             </div>
 
             <h1
-              className="font-serif-display text-4xl font-bold tracking-tight text-[#F4F1EA] sm:text-5xl lg:text-6xl"
+              className="font-display text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl"
               style={{ textWrap: 'balance' }}
             >
               Покерный клуб «Чек это проигрыш»
             </h1>
 
-            <p className="max-w-2xl text-base leading-relaxed text-[#94A39E] sm:text-lg">
-              {clubAbout}
+            <p className="max-w-xl text-base leading-relaxed text-slate-300">
+              Клуб спортивного покера и живого общения. Каждый вечер играем 2–3 рейтинговых турнира,
+              ведём сезонный отбор в Топ-10 за Финальный стол и жёстко наказываем за чек с натсом на ривере.
             </p>
 
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            <div className="flex flex-wrap items-center gap-3.5 pt-1">
               <button
                 onClick={() => onNavigate('live')}
-                className="inline-flex items-center gap-2.5 rounded-lg bg-[#D4AF37] px-6 py-3 text-sm font-semibold text-[#0B0F0E] transition-colors hover:bg-[#e3be42] whitespace-nowrap shrink-0 cursor-pointer"
+                className="btn-crimson inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <span>Открыть Live-Таймер зала</span>
+                <span>Экран турнира (ТВ 16:9)</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
 
               <button
-                onClick={() => onNavigate('leaderboard')}
-                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-5 py-3 text-sm font-medium text-[#F4F1EA] transition-colors hover:bg-white/10 whitespace-nowrap shrink-0 cursor-pointer"
+                onClick={() => onNavigate('admin')}
+                className="btn-glass inline-flex items-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold text-white whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <span>Сезонный рейтинг (Топ-10)</span>
+                <Play className="h-4 w-4 text-[#F43F5E]" />
+                <span>Пульт дилера</span>
               </button>
 
               <button
-                onClick={() => onNavigate('rules')}
-                className="px-3 py-3 text-sm font-medium text-[#94A39E] underline-offset-4 hover:text-[#F4F1EA] hover:underline whitespace-nowrap shrink-0 cursor-pointer"
+                onClick={() => onNavigate('leaderboard')}
+                className="px-3 py-3 text-sm font-medium text-slate-400 hover:text-white whitespace-nowrap shrink-0 cursor-pointer"
               >
-                Регламент и штрафы
+                Рейтинг сезона →
               </button>
             </div>
           </div>
 
-          {/* Right Column: Bespoke Club Emblem & Live Table Telemetry */}
+          {/* Right 5 Cols: Pocket Aces Visual + Live Table Status */}
           <div className="lg:col-span-5">
-            <div className="rounded-xl border border-white/10 bg-[#0B0F0E]/90 p-6 sm:p-7">
+            <div className="glass-well rounded-2xl p-6">
               <div className="flex items-center justify-between border-b border-white/10 pb-5">
                 <div className="flex items-center gap-4">
-                  {/* Custom SVG Club Crest */}
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#D4AF37]/40 bg-[#121917]">
-                    <svg
-                      viewBox="0 0 64 64"
-                      className="h-9 w-9 text-[#D4AF37]"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="2" strokeDasharray="6 4" />
-                      <circle cx="32" cy="32" r="21" stroke="currentColor" strokeWidth="1.5" />
-                      <path
-                        d="M32 16C25 24 20 29 20 35C20 39.5 23.5 42.5 27.5 42.5C29.5 42.5 31 41.5 32 40C33 41.5 34.5 42.5 36.5 42.5C40.5 42.5 44 39.5 44 35C44 29 39 24 32 16Z"
-                        fill="currentColor"
-                      />
-                      <path d="M32 40L28 48H36L32 40Z" fill="currentColor" />
-                    </svg>
+                  {/* Overlapping Pocket Aces Graphic (A♠ A♥) */}
+                  <div className="relative flex h-14 w-16 shrink-0 items-center">
+                    <div className="flex h-13 w-10 -rotate-6 flex-col justify-between rounded-lg border border-white/25 bg-[#141722] p-1.5 shadow-lg">
+                      <span className="font-mono-tabular text-xs font-bold leading-none text-white">
+                        A♠
+                      </span>
+                      <span className="self-center text-base leading-none text-white">♠</span>
+                    </div>
+                    <div className="absolute left-5 flex h-13 w-10 rotate-6 flex-col justify-between rounded-lg border border-[#F43F5E]/50 bg-[#1B1218] p-1.5 shadow-xl">
+                      <span className="font-mono-tabular text-xs font-bold leading-none text-[#F43F5E]">
+                        A♥
+                      </span>
+                      <span className="self-center text-base leading-none text-[#F43F5E]">♥</span>
+                    </div>
                   </div>
+
                   <div>
-                    <div className="text-xs text-[#94A39E]">Трансляция из зала клуба</div>
-                    <div className="text-base font-semibold text-[#F4F1EA]">
-                      {liveState?.tournamentTitle || 'Вечерняя Серия'}
+                    <div className="text-xs text-slate-400">Сейчас за столом</div>
+                    <div className="font-display text-base font-bold text-white">
+                      {liveState?.tournamentTitle || 'Вечерний Холдем'}
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-[#94A39E]">Статус таймера</div>
-                  <div className="text-xs font-semibold text-[#D4AF37]">
-                    {liveState?.status === 'running'
-                      ? 'Идёт уровень'
-                      : liveState?.status === 'completed'
-                        ? 'Завершён'
-                        : 'На паузе'}
-                  </div>
-                </div>
+
+                <span className="text-xs font-bold text-[#F43F5E]">
+                  {liveState?.status === 'running'
+                    ? 'ИДЁТ ИГРА'
+                    : liveState?.status === 'completed'
+                      ? 'ЗАВЕРШЁН'
+                      : 'ПАУЗА'}
+                </span>
               </div>
 
               {liveState && (
                 <div className="mt-5 space-y-5">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-xs text-[#94A39E]">Таймер уровня</div>
-                      <div className="font-mono-tabular mt-1 text-3xl font-bold text-[#F4F1EA]">
+                      <div className="text-xs text-slate-400">Таймер уровня</div>
+                      <div className="font-mono-tabular mt-1 text-3xl font-extrabold text-white sm:text-4xl">
                         {formatClock(liveState.remainingSeconds)}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-[#94A39E]">Текущие блайнды</div>
-                      <div className="font-mono-tabular mt-1 text-2xl font-bold text-[#D4AF37]">
+                      <div className="text-xs text-slate-400">Текущие блайнды</div>
+                      <div className="font-mono-tabular mt-1 text-2xl font-extrabold text-[#F43F5E] sm:text-3xl">
                         {currentLevel?.isBreak
                           ? 'ПЕРЕРЫВ'
-                          : `${currentLevel?.smallBlind.toLocaleString('ru-RU')} / ${currentLevel?.bigBlind.toLocaleString('ru-RU')}`}
+                          : `${currentLevel?.smallBlind.toLocaleString('ru-RU')}/${currentLevel?.bigBlind.toLocaleString('ru-RU')}`}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between border-t border-white/10 pt-4 text-xs text-[#94A39E]">
+                  <div className="flex items-center justify-between border-t border-white/10 pt-4 text-xs text-slate-400">
                     <span>
-                      Осталось за столом:{' '}
-                      <strong className="font-mono-tabular text-[#F4F1EA]">
+                      Осталось игроков:{' '}
+                      <strong className="font-mono-tabular text-white">
                         {liveState.activePlayers.length} из {liveState.totalInitialPlayers}
                       </strong>
                     </span>
                     <span aria-hidden="true">·</span>
                     <span>
-                      Стартовый стек:{' '}
-                      <strong className="font-mono-tabular text-[#F4F1EA]">
+                      Стек:{' '}
+                      <strong className="font-mono-tabular text-white">
                         {liveState.startingStack.toLocaleString('ru-RU')}
                       </strong>
                     </span>
                   </div>
-
-                  <button
-                    onClick={() => onNavigate('live')}
-                    className="w-full rounded-lg border border-[#D4AF37]/30 bg-[#D4AF37]/10 py-2.5 text-xs font-semibold text-[#D4AF37] transition-colors hover:bg-[#D4AF37]/20 cursor-pointer"
-                  >
-                    Развернуть ТВ-экран турнира (16:9)
-                  </button>
                 </div>
               )}
             </div>
           </div>
         </div>
+      </section>
 
-        {/* 4-Column Club Key Figures Strip */}
-        <div className="relative z-10 mt-12 grid grid-cols-2 gap-6 border-t border-white/10 pt-8 sm:grid-cols-4">
-          <div>
-            <div className="text-xs text-[#94A39E]">Стартовый стек</div>
-            <div className="font-mono-tabular mt-1 text-2xl font-bold text-[#F4F1EA]">
-              25 000 фишек
+      {/* EVENING TOURNAMENTS (2-3 PER NIGHT) */}
+      <section className="space-y-5">
+        <div>
+          <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">
+            Расписание игрового вечера
+          </h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Проводим 2–3 турнира за вечер · Стартовый стек 25 000 фишек · Уровни по 10 минут
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          {announcements.map((item, idx) => (
+            <div
+              key={item.id}
+              className="glass-card flex flex-col justify-between rounded-2xl p-6"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Игра #{idx + 1}</span>
+                  <span className="font-mono-tabular font-bold text-[#F43F5E]">
+                    {item.eventDate}
+                  </span>
+                </div>
+                <h3 className="font-display text-lg font-bold text-white">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-slate-300">{item.description}</p>
+              </div>
+
+              <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4 text-xs text-slate-400">
+                <span>{item.format.split('•')[0]}</span>
+                <span className="font-mono-tabular font-semibold text-white">
+                  Мест: {item.spotsTaken}/{item.spotsTotal}
+                </span>
+              </div>
             </div>
-            <div className="mt-0.5 text-xs text-[#94A39E]">Единый стандарт вечера</div>
-          </div>
-          <div>
-            <div className="text-xs text-[#94A39E]">Длительность уровней</div>
-            <div className="font-mono-tabular mt-1 text-2xl font-bold text-[#F4F1EA]">
-              10:00 минут
-            </div>
-            <div className="mt-0.5 text-xs text-[#94A39E]">От 100/200 до 40k/50k</div>
-          </div>
-          <div>
-            <div className="text-xs text-[#94A39E]">Вечерняя программа</div>
-            <div className="font-mono-tabular mt-1 text-2xl font-bold text-[#F4F1EA]">
-              2–3 турнира
-            </div>
-            <div className="mt-0.5 text-xs text-[#94A39E]">Форматы на 1 и 2 стола</div>
-          </div>
-          <div>
-            <div className="text-xs text-[#94A39E]">Проходной балл в Топ-10</div>
-            <div className="font-mono-tabular mt-1 text-2xl font-bold text-[#D4AF37]">
-              {tenthPlacePoints} очк.
-            </div>
-            <div className="mt-0.5 text-xs text-[#94A39E]">Отбор за Финальный стол</div>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* SECTION 01: EVENING TOURNAMENT ANNOUNCEMENTS */}
-      <section className="space-y-6">
-        <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-end">
+      {/* RULES, PENALTIES & POINTS TABLE IN ONE CLEAN SPLIT */}
+      <section className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        {/* Left 7 Cols: Club Rules & Penalties */}
+        <div className="glass-panel space-y-6 rounded-3xl p-6 sm:p-8 lg:col-span-7">
           <div>
-            <h2 className="font-serif-display text-3xl font-bold text-[#F4F1EA]">
-              01. Анонсы турниров игрового вечера
+            <h2 className="font-display text-2xl font-bold text-white">
+              Правила и система штрафов
             </h2>
-            <p className="mt-1 text-sm text-[#94A39E]">
-              Обычно проводится 2–3 рейтинговых турнира за вечер с автоматическим зачетом очков в сезон
+            <p className="mt-1 text-xs text-slate-400">
+              За столом запрещены оскорбления, подсказки в раздаче и затягивание времени
             </p>
           </div>
-          <button
-            onClick={() => onNavigate('admin')}
-            className="text-xs font-medium text-[#D4AF37] hover:underline whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Управление расписанием в CMS →
-          </button>
-        </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {announcements.map((item, idx) => {
-            const seatsLeft = Math.max(0, item.spotsTotal - item.spotsTaken);
-            return (
-              <article
-                key={item.id}
-                className="flex flex-col justify-between rounded-xl border border-white/10 bg-[#121917] p-6 transition-colors hover:border-white/20"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs text-[#94A39E]">
-                    <span>Турнир вечера #{idx + 1}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-mono-tabular text-[#D4AF37]">{item.eventDate}</span>
-                  </div>
-
-                  <h3 className="text-lg font-semibold text-[#F4F1EA]">{item.title}</h3>
-
-                  <p className="text-sm leading-relaxed text-[#94A39E]">{item.description}</p>
-                </div>
-
-                <div className="mt-6 space-y-3 border-t border-white/10 pt-4">
-                  <div className="text-xs text-[#94A39E]">{item.format}</div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#94A39E]">
-                      Занято боксов:{' '}
-                      <strong className="font-mono-tabular text-[#F4F1EA]">
-                        {item.spotsTaken} / {item.spotsTotal}
-                      </strong>
-                    </span>
-                    <span className="font-mono-tabular text-[#10B981]">
-                      Свободно мест: {seatsLeft}
-                    </span>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* SECTION 02: SEASONAL LEADERBOARD PREVIEW & POINTS MATRICES */}
-      <section className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        {/* Left 7 Cols: Top-5 Seasonal Standings Preview */}
-        <div className="space-y-5 rounded-xl border border-white/10 bg-[#121917] p-6 sm:p-8 lg:col-span-7">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-            <div>
-              <h2 className="font-serif-display text-2xl font-bold text-[#F4F1EA]">
-                02. Лидеры отбора за Финальный стол
-              </h2>
-              <p className="mt-1 text-xs text-[#94A39E]">{seasonInfo}</p>
-            </div>
-            <button
-              onClick={() => onNavigate('leaderboard')}
-              className="rounded-lg border border-white/15 px-3.5 py-2 text-xs font-medium text-[#F4F1EA] transition-colors hover:bg-white/5 whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              Полная таблица ({players.length})
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-white/10 text-xs text-[#94A39E]">
-                  <th className="py-2.5 pr-3 font-medium">Место</th>
-                  <th className="py-2.5 px-3 font-medium">Игрок</th>
-                  <th className="py-2.5 px-3 text-right font-medium">Игр</th>
-                  <th className="py-2.5 px-3 text-right font-medium">Побед</th>
-                  <th className="py-2.5 pl-3 text-right font-medium">Очки сезона</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {topFivePlayers.map((player, index) => (
-                  <tr key={player.id} className="hover:bg-white/[0.02]">
-                    <td className="font-mono-tabular py-3 pr-3 font-semibold text-[#D4AF37]">
-                      #{index + 1}
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="font-medium text-[#F4F1EA]">{player.name}</div>
-                      <div className="text-xs text-[#94A39E]">{player.nickname}</div>
-                    </td>
-                    <td className="font-mono-tabular py-3 px-3 text-right text-[#94A39E]">
-                      {player.gamesPlayed}
-                    </td>
-                    <td className="font-mono-tabular py-3 px-3 text-right text-[#94A39E]">
-                      {player.winsCount}
-                    </td>
-                    <td className="font-mono-tabular py-3 pl-3 text-right font-bold text-[#F4F1EA]">
-                      {player.seasonPoints}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-white/10 pt-4 text-xs text-[#94A39E]">
-            <span>Топ-10 участников по итогам 2 месяцев выходят в Финал Сезона</span>
-            <button
-              onClick={() => onNavigate('leaderboard')}
-              className="font-medium text-[#D4AF37] hover:underline whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              Смотреть все 10 путёвок →
-            </button>
-          </div>
-        </div>
-
-        {/* Right 5 Cols: Points Calculation Templates A & B (TZ Section 6) */}
-        <div className="space-y-5 rounded-xl border border-white/10 bg-[#121917] p-6 sm:p-8 lg:col-span-5">
-          <div className="flex flex-col justify-between gap-3 border-b border-white/10 pb-4">
-            <div>
-              <h2 className="font-serif-display text-2xl font-bold text-[#F4F1EA]">
-                03. Начисление очков
-              </h2>
-              <p className="mt-1 text-xs text-[#94A39E]">
-                Автоматический расчет в БД при нажатии кнопки «Выбыл»
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="glass-well rounded-2xl p-4">
+              <div className="font-mono-tabular text-xl font-extrabold text-amber-400">
+                −500 фишек
+              </div>
+              <div className="mt-1 text-sm font-bold text-white">
+                Показ карт до конца раздачи
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+                За вскрытие или демонстрацию карт при активных игроках в раздаче.
               </p>
             </div>
 
-            {/* Interactive Segmented Control (Allowed by Zero-Pill rules) */}
-            <div className="flex items-center gap-1 rounded-lg bg-[#0B0F0E] p-1 border border-white/10">
-              <button
-                onClick={() => setSelectedTemplate('1_table')}
-                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  selectedTemplate === '1_table'
-                    ? 'bg-[#D4AF37] text-[#0B0F0E] font-semibold'
-                    : 'text-[#94A39E] hover:text-[#F4F1EA]'
-                }`}
-              >
-                Шаблон A (1 стол • 10 мест)
-              </button>
-              <button
-                onClick={() => setSelectedTemplate('2_tables')}
-                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  selectedTemplate === '2_tables'
-                    ? 'bg-[#D4AF37] text-[#0B0F0E] font-semibold'
-                    : 'text-[#94A39E] hover:text-[#F4F1EA]'
-                }`}
-              >
-                Шаблон B (2 стола • 20 мест)
-              </button>
+            <div className="glass-crimson rounded-2xl p-4">
+              <div className="font-mono-tabular text-xl font-extrabold text-[#F43F5E]">
+                Бан 5 минут
+              </div>
+              <div className="mt-1 text-sm font-bold text-white">
+                «Чек» с натсом на ривере
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-200">
+                Чек с лучшей возможной комбинацией на последнем слове — удаление из-за стола на 5 минут.
+              </p>
+            </div>
+
+            <div className="glass-well rounded-2xl p-4">
+              <div className="font-mono-tabular text-xl font-extrabold text-rose-400">
+                −1 000 фишек
+              </div>
+              <div className="mt-1 text-sm font-bold text-white">
+                Сговор за столом
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-400">
+                Командная игра, софт-плей, передача фишек или сигналов между игроками.
+              </p>
             </div>
           </div>
 
-          {selectedTemplate === '1_table' ? (
-            <div className="space-y-3">
-              <div className="text-xs text-[#94A39E]">
-                Игра в один стол (до 10 участников). За 1-е место начисляется 150 очков:
-              </div>
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-                {Object.entries(TEMPLATE_A_POINTS).map(([place, pts]) => (
-                  <div
-                    key={place}
-                    className="rounded-lg border border-white/10 bg-[#0B0F0E] p-2.5 text-center"
-                  >
-                    <div className="text-xs text-[#94A39E]">{place} место</div>
-                    <div className="font-mono-tabular mt-1 text-base font-bold text-[#D4AF37]">
-                      +{pts}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-xs text-[#94A39E]">
-                Игра в два стола (от 14 до 20 участников). За 1-е место начисляется 280 очков:
-              </div>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                {Object.entries(TEMPLATE_B_POINTS).map(([place, pts]) => (
-                  <div
-                    key={place}
-                    className="rounded-lg border border-white/10 bg-[#0B0F0E] p-2 text-center"
-                  >
-                    <div className="text-[11px] text-[#94A39E]">{place} место</div>
-                    <div className="font-mono-tabular mt-0.5 text-sm font-bold text-[#D4AF37]">
-                      +{pts}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-xs leading-relaxed text-slate-400">
+            <strong className="text-white">Отказ от ответственности (УК РФ):</strong> В клубе «Чек
+            это проигрыш» строго запрещена игра на реальные деньги, кэш-игры и денежные призы. Все
+            фишки используются исключительно для спортивного подсчёта очков сезонного рейтинга.
+          </div>
+        </div>
 
-          <div className="border-t border-white/10 pt-3 text-xs text-[#94A39E]">
-            Главный закон клуба: за «чек» с натсом на ривере в позиции последнего слова игрок удаляется из-за стола на 5 минут.
+        {/* Right 5 Cols: Points Templates A & B */}
+        <div className="glass-panel flex flex-col justify-between space-y-5 rounded-3xl p-6 sm:p-8 lg:col-span-5">
+          <div className="space-y-4">
+            <div>
+              <h2 className="font-display text-2xl font-bold text-white">
+                Сетка начисления очков
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                Начисляются автоматически при нажатии «Выбыл» в пульте дилера
+              </p>
+            </div>
+
+            <div className="glass-well flex items-center gap-1 rounded-xl p-1">
+              <button
+                onClick={() => setSelectedTemplate('1_table')}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                  selectedTemplate === '1_table'
+                    ? 'btn-crimson'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                1 стол (10 мест)
+              </button>
+              <button
+                onClick={() => setSelectedTemplate('2_tables')}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                  selectedTemplate === '2_tables'
+                    ? 'btn-crimson'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                2 стола (14–20 мест)
+              </button>
+            </div>
+
+            {selectedTemplate === '1_table' ? (
+              <div className="grid grid-cols-5 gap-2 pt-1">
+                {Object.entries(TEMPLATE_A_POINTS).map(([place, pts]) => (
+                  <div key={place} className="glass-well rounded-xl p-2.5 text-center">
+                    <div className="text-[11px] text-slate-400">#{place}</div>
+                    <div className="font-mono-tabular mt-0.5 text-sm font-bold text-white">
+                      +{pts}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-5 gap-2 pt-1">
+                {Object.entries(TEMPLATE_B_POINTS).map(([place, pts]) => (
+                  <div key={place} className="glass-well rounded-xl p-2 text-center">
+                    <div className="text-[11px] text-slate-400">#{place}</div>
+                    <div className="font-mono-tabular mt-0.5 text-xs font-bold text-white">
+                      +{pts}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-white/10 pt-4 text-xs text-slate-400">
+            Сезон длится 2 месяца · Топ-10 игроков по очкам выходят за Финальный стол сезона.
           </div>
         </div>
       </section>

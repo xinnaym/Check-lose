@@ -7,151 +7,147 @@ import React, { useState } from 'react';
 import { ClubProvider, useClub } from './context/ClubContext.tsx';
 import { HomeView } from './components/HomeView.tsx';
 import { LeaderboardView } from './components/LeaderboardView.tsx';
-import { RulesView } from './components/RulesView.tsx';
-import { ArchiveView } from './components/ArchiveView.tsx';
 import { LiveTimerView } from './components/LiveTimerView.tsx';
 import { AdminView } from './components/AdminView.tsx';
 
-type NavTab = 'home' | 'leaderboard' | 'rules' | 'archive' | 'live' | 'admin';
+type NavTab = 'home' | 'leaderboard' | 'live' | 'admin';
 
 const ClubLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const { loading, error, refreshAll } = useClub();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0B0F0E] text-[#F4F1EA]">
-      {/* Top Bar Contract: 3 Zones separated by gap-8 */}
-      <header className="flex items-center justify-between gap-8 border-b border-white/10 bg-[#0B0F0E]/95 px-6 py-4 backdrop-blur-sm">
-        {/* Zone 1: Single text element wordmark */}
-        <button
-          onClick={() => setActiveTab('home')}
-          className="font-serif-display text-xl font-bold tracking-tight text-[#F4F1EA] whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          Чек это проигрыш
-        </button>
+    <div className="relative min-h-screen flex flex-col bg-[#08090E] text-[#F8FAFC]">
+      {/* Poker Studio Ambient Lighting Behind Liquid Glass */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div
+          className="absolute -top-44 left-1/4 h-[520px] w-[620px] rounded-full opacity-30 blur-[140px]"
+          style={{
+            background: 'radial-gradient(circle, rgba(225, 29, 72, 0.55) 0%, rgba(159, 18, 57, 0.05) 70%, transparent 100%)',
+          }}
+        />
+        <div
+          className="absolute top-1/3 -right-40 h-[540px] w-[540px] rounded-full opacity-20 blur-[150px]"
+          style={{
+            background: 'radial-gradient(circle, rgba(56, 189, 248, 0.45) 0%, rgba(15, 23, 42, 0.05) 70%, transparent 100%)',
+          }}
+        />
+        <div
+          className="absolute -bottom-48 -left-24 h-[500px] w-[580px] rounded-full opacity-20 blur-[140px]"
+          style={{
+            background: 'radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%)',
+          }}
+        />
+      </div>
 
-        {/* Zone 2: 5 clean single-line text navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#94A39E]">
+      {/* Top Bar Contract: 3 Zones separated by gap-8 */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#08090E]/75 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-8 px-4 py-4 sm:px-6 lg:px-8">
+          {/* Zone 1: Single text element wordmark */}
           <button
             onClick={() => setActiveTab('home')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-[#F4F1EA] ${
-              activeTab === 'home' ? 'text-[#F4F1EA] underline underline-offset-8 decoration-[#D4AF37]' : ''
-            }`}
+            className="font-display text-lg font-extrabold tracking-tight text-white whitespace-nowrap shrink-0 cursor-pointer"
           >
-            Клуб
+            ♠ ЧЕК ЭТО ПРОИГРЫШ
           </button>
-          <button
-            onClick={() => setActiveTab('leaderboard')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-[#F4F1EA] ${
-              activeTab === 'leaderboard' ? 'text-[#F4F1EA] underline underline-offset-8 decoration-[#D4AF37]' : ''
-            }`}
-          >
-            Рейтинг
-          </button>
-          <button
-            onClick={() => setActiveTab('rules')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-[#F4F1EA] ${
-              activeTab === 'rules' ? 'text-[#F4F1EA] underline underline-offset-8 decoration-[#D4AF37]' : ''
-            }`}
-          >
-            Регламент
-          </button>
-          <button
-            onClick={() => setActiveTab('archive')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-[#F4F1EA] ${
-              activeTab === 'archive' ? 'text-[#F4F1EA] underline underline-offset-8 decoration-[#D4AF37]' : ''
-            }`}
-          >
-            Архив
-          </button>
-          <button
-            onClick={() => setActiveTab('admin')}
-            className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-[#F4F1EA] ${
-              activeTab === 'admin' ? 'text-[#F4F1EA] underline underline-offset-8 decoration-[#D4AF37]' : ''
-            }`}
-          >
-            Админ-панель
-          </button>
-        </nav>
 
-        {/* Zone 3: 1 primary action */}
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => setActiveTab('live')}
-            className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeTab === 'live'
-                ? 'bg-[#F4F1EA] text-[#0B0F0E]'
-                : 'bg-[#D4AF37] text-[#0B0F0E] hover:bg-[#e3be42]'
-            }`}
-          >
-            Live-Таймер (ТВ)
-          </button>
+          {/* Zone 2: Clean single-line navigation links */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
+            <button
+              onClick={() => setActiveTab('home')}
+              className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-white ${
+                activeTab === 'home'
+                  ? 'text-white font-semibold underline underline-offset-8 decoration-[#F43F5E] decoration-2'
+                  : ''
+              }`}
+            >
+              Клуб и правила
+            </button>
+            <button
+              onClick={() => setActiveTab('leaderboard')}
+              className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-white ${
+                activeTab === 'leaderboard'
+                  ? 'text-white font-semibold underline underline-offset-8 decoration-[#F43F5E] decoration-2'
+                  : ''
+              }`}
+            >
+              Рейтинг сезона
+            </button>
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-white ${
+                activeTab === 'admin'
+                  ? 'text-white font-semibold underline underline-offset-8 decoration-[#F43F5E] decoration-2'
+                  : ''
+              }`}
+            >
+              Пульт дилера
+            </button>
+          </nav>
+
+          {/* Zone 3: 1 primary action */}
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={() => setActiveTab('live')}
+              className={`rounded-xl px-4 py-2 text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer ${
+                activeTab === 'live' ? 'btn-glass text-white' : 'btn-crimson'
+              }`}
+            >
+              Live-Таймер (ТВ)
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Mobile Navigation Strip (visible only below md) */}
-      <div className="flex md:hidden items-center gap-4 overflow-x-auto border-b border-white/10 bg-[#121917] px-4 py-2.5 text-xs font-medium text-[#94A39E]">
+      {/* Mobile Navigation Strip */}
+      <div className="relative z-30 flex md:hidden items-center justify-around border-b border-white/10 bg-[#08090E]/90 px-4 py-2.5 text-xs font-medium text-slate-400 backdrop-blur-xl">
         <button
           onClick={() => setActiveTab('home')}
-          className={`whitespace-nowrap shrink-0 ${activeTab === 'home' ? 'text-[#D4AF37] font-semibold' : ''}`}
+          className={`whitespace-nowrap shrink-0 ${activeTab === 'home' ? 'text-white font-bold' : ''}`}
         >
-          Клуб
+          Клуб и правила
         </button>
         <button
           onClick={() => setActiveTab('leaderboard')}
-          className={`whitespace-nowrap shrink-0 ${activeTab === 'leaderboard' ? 'text-[#D4AF37] font-semibold' : ''}`}
+          className={`whitespace-nowrap shrink-0 ${activeTab === 'leaderboard' ? 'text-white font-bold' : ''}`}
         >
           Рейтинг
         </button>
         <button
-          onClick={() => setActiveTab('rules')}
-          className={`whitespace-nowrap shrink-0 ${activeTab === 'rules' ? 'text-[#D4AF37] font-semibold' : ''}`}
-        >
-          Регламент
-        </button>
-        <button
-          onClick={() => setActiveTab('archive')}
-          className={`whitespace-nowrap shrink-0 ${activeTab === 'archive' ? 'text-[#D4AF37] font-semibold' : ''}`}
-        >
-          Архив
-        </button>
-        <button
           onClick={() => setActiveTab('admin')}
-          className={`whitespace-nowrap shrink-0 ${activeTab === 'admin' ? 'text-[#D4AF37] font-semibold' : ''}`}
+          className={`whitespace-nowrap shrink-0 ${activeTab === 'admin' ? 'text-white font-bold' : ''}`}
         >
-          Админ-панель
+          Пульт дилера
         </button>
       </div>
 
       {/* Main Content Container */}
-      <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 pt-8 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto w-full max-w-[1360px] flex-1 px-4 pt-8 sm:px-6 lg:px-8">
         {error && (
-          <div className="mb-6 flex items-center justify-between rounded-xl border border-[#EF4444]/40 bg-[#121917] px-5 py-4 text-xs text-[#F4F1EA]">
+          <div className="glass-panel mb-6 flex items-center justify-between rounded-2xl border border-[#F43F5E]/40 px-5 py-4 text-xs text-white">
             <span>{error}</span>
             <button
               onClick={() => refreshAll()}
-              className="rounded-lg bg-white/10 px-3 py-1.5 font-medium hover:bg-white/15 cursor-pointer"
+              className="btn-glass rounded-lg px-3.5 py-1.5 font-medium cursor-pointer"
             >
-              Повторить
+              Обновить
             </button>
           </div>
         )}
 
         {loading ? (
           <div className="space-y-6 py-8">
-            <div className="h-64 animate-pulse rounded-2xl border border-white/10 bg-[#121917]" />
+            <div className="glass-panel h-64 animate-pulse rounded-3xl" />
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              <div className="h-44 animate-pulse rounded-xl border border-white/10 bg-[#121917]" />
-              <div className="h-44 animate-pulse rounded-xl border border-white/10 bg-[#121917]" />
-              <div className="h-44 animate-pulse rounded-xl border border-white/10 bg-[#121917]" />
+              <div className="glass-panel h-44 animate-pulse rounded-2xl" />
+              <div className="glass-panel h-44 animate-pulse rounded-2xl" />
+              <div className="glass-panel h-44 animate-pulse rounded-2xl" />
             </div>
           </div>
         ) : (
           <>
             {activeTab === 'home' && <HomeView onNavigate={setActiveTab} />}
             {activeTab === 'leaderboard' && <LeaderboardView />}
-            {activeTab === 'rules' && <RulesView />}
-            {activeTab === 'archive' && <ArchiveView />}
             {activeTab === 'live' && (
               <LiveTimerView onOpenAdmin={() => setActiveTab('admin')} />
             )}
@@ -160,51 +156,15 @@ const ClubLayout: React.FC = () => {
         )}
       </main>
 
-      {/* Quiet Editorial Footer */}
-      <footer className="border-t border-white/10 bg-[#0B0F0E] py-8 text-xs text-[#94A39E]">
-        <div className="mx-auto flex max-w-[1360px] flex-col justify-between gap-4 px-4 sm:flex-row sm:items-center sm:px-6 lg:px-8">
-          <div className="space-y-1">
-            <div className="font-serif-display text-base font-bold text-[#F4F1EA]">
-              Покерный клуб «Чек это проигрыш»
-            </div>
-            <p>
-              Спортивно-развлекательный клуб интеллектуального досуга (Техасский Холдем). Игры на
-              реальные деньги строго запрещены согласно УК РФ.
-            </p>
+      {/* Clean Footer with Mandatory Legal Notice */}
+      <footer className="relative z-10 mt-12 border-t border-white/10 bg-[#08090E]/85 py-6 text-xs text-slate-400 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1360px] flex-col justify-between gap-3 px-4 sm:flex-row sm:items-center sm:px-6 lg:px-8">
+          <div className="font-display font-bold text-white">
+            ♠ Покерный клуб «Чек это проигрыш» · Техасский Холдем
           </div>
-
-          <div className="flex flex-wrap items-center gap-5">
-            <button
-              onClick={() => setActiveTab('home')}
-              className="hover:text-[#F4F1EA] cursor-pointer"
-            >
-              Главная
-            </button>
-            <button
-              onClick={() => setActiveTab('leaderboard')}
-              className="hover:text-[#F4F1EA] cursor-pointer"
-            >
-              Сезонный рейтинг
-            </button>
-            <button
-              onClick={() => setActiveTab('rules')}
-              className="hover:text-[#F4F1EA] cursor-pointer"
-            >
-              Правила и штрафы
-            </button>
-            <button
-              onClick={() => setActiveTab('live')}
-              className="hover:text-[#F4F1EA] cursor-pointer"
-            >
-              Live-Таймер (16:9)
-            </button>
-            <button
-              onClick={() => setActiveTab('admin')}
-              className="hover:text-[#F4F1EA] cursor-pointer"
-            >
-              Пульт дилера
-            </button>
-          </div>
+          <p className="text-slate-400">
+            Исключительно спортивно-интеллектуальный формат. Игры на реальные деньги строго запрещены (УК РФ).
+          </p>
         </div>
       </footer>
     </div>

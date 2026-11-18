@@ -1,20 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
-import { Search, Trophy, Award, AlertTriangle } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 
 export const LeaderboardView: React.FC = () => {
-  const { players, getContentByKey } = useClub();
+  const { players, addPlayer } = useClub();
   const [searchQuery, setSearchQuery] = useState('');
-  const [zoneFilter, setZoneFilter] = useState<'all' | 'top10' | 'contenders'>('all');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newNick, setNewNick] = useState('');
 
-  const seasonInfo = getContentByKey(
-    'season_info',
-    'Длительность сезона — 2 месяца. Топ-10 игроков сезона выходят за Финальный стол.'
-  );
-
-  // Cutoff score is the 10th place player's score
   const cutoffScore = players[9]?.seasonPoints ?? 0;
-  const leaderScore = players[0]?.seasonPoints ?? 0;
 
   const rankedPlayers = useMemo(() => {
     return players.map((p, idx) => ({
@@ -26,212 +21,172 @@ export const LeaderboardView: React.FC = () => {
   }, [players, cutoffScore]);
 
   const filteredPlayers = useMemo(() => {
-    return rankedPlayers.filter((p) => {
-      const matchesQuery =
+    return rankedPlayers.filter(
+      (p) =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.nickname.toLowerCase().includes(searchQuery.toLowerCase());
-      if (!matchesQuery) return false;
-      if (zoneFilter === 'top10') return p.rank <= 10;
-      if (zoneFilter === 'contenders') return p.rank > 10;
-      return true;
-    });
-  }, [rankedPlayers, searchQuery, zoneFilter]);
+        p.nickname.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [rankedPlayers, searchQuery]);
+
+  const handleQuickAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    await addPlayer({ name: newName, nickname: newNick, seasonPoints: 0 });
+    setNewName('');
+    setNewNick('');
+    setShowAddForm(false);
+  };
 
   return (
     <div className="space-y-8 pb-16">
-      {/* Header & Season Summary */}
-      <div className="rounded-xl border border-white/10 bg-[#121917] p-6 sm:p-8">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-center">
-          <div className="space-y-2 lg:col-span-8">
-            <div className="flex items-center gap-2 text-xs text-[#94A39E]">
-              <span>Сезонный рейтинг клуба</span>
-              <span aria-hidden="true">·</span>
-              <span>Длительность сезона: 2 месяца</span>
-              <span aria-hidden="true">·</span>
-              <span>Отбор в Топ-10</span>
-            </div>
-            <h1 className="font-serif-display text-3xl font-bold text-[#F4F1EA] sm:text-4xl">
-              Турнирная таблица и отбор за «Финальный стол»
-            </h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-[#94A39E]">{seasonInfo}</p>
+      {/* Header */}
+      <div className="glass-panel flex flex-col justify-between gap-6 rounded-3xl p-6 sm:p-8 lg:flex-row lg:items-center">
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-[#F43F5E]">
+            СЕЗОННЫЙ РЕЙТИНГ (2 МЕСЯЦА) · ОТБОР В ТОП-10
+          </div>
+          <h1 className="font-display text-3xl font-extrabold text-white sm:text-4xl">
+            Гонка за «Финальный стол»
+          </h1>
+          <p className="text-sm text-slate-400">
+            Первые 10 игроков по итогам двухмесячного сезона проходят за главный Финальный стол клуба.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Найти игрока..."
+              className="glass-well w-full rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-400 focus:border-[#F43F5E] focus:outline-none"
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 lg:col-span-4 lg:border-t-0 lg:border-l lg:pl-6 lg:pt-0">
-            <div>
-              <div className="text-xs text-[#94A39E]">Лидер сезона (#1)</div>
-              <div className="font-mono-tabular mt-1 text-2xl font-bold text-[#D4AF37]">
-                {leaderScore} очк.
-              </div>
-              <div className="mt-0.5 truncate text-xs text-[#F4F1EA]">
-                {players[0]?.name || '—'}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#94A39E]">Порог Финального стола (#10)</div>
-              <div className="font-mono-tabular mt-1 text-2xl font-bold text-[#10B981]">
-                {cutoffScore} очк.
-              </div>
-              <div className="mt-0.5 truncate text-xs text-[#F4F1EA]">
-                {players[9]?.name || '—'}
-              </div>
-            </div>
-          </div>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-white whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Plus className="h-4 w-4 text-[#F43F5E]" />
+            <span>Новый игрок</span>
+          </button>
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-[#121917] p-1">
-          <button
-            onClick={() => setZoneFilter('all')}
-            className={`rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              zoneFilter === 'all'
-                ? 'bg-[#D4AF37] text-[#0B0F0E] font-semibold'
-                : 'text-[#94A39E] hover:text-[#F4F1EA]'
-            }`}
-          >
-            Все игроки ({rankedPlayers.length})
-          </button>
-          <button
-            onClick={() => setZoneFilter('top10')}
-            className={`rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              zoneFilter === 'top10'
-                ? 'bg-[#D4AF37] text-[#0B0F0E] font-semibold'
-                : 'text-[#94A39E] hover:text-[#F4F1EA]'
-            }`}
-          >
-            Топ-10 • Финальный стол
-          </button>
-          <button
-            onClick={() => setZoneFilter('contenders')}
-            className={`rounded-md px-3.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              zoneFilter === 'contenders'
-                ? 'bg-[#D4AF37] text-[#0B0F0E] font-semibold'
-                : 'text-[#94A39E] hover:text-[#F4F1EA]'
-            }`}
-          >
-            Претенденты (11+ место)
-          </button>
-        </div>
-
-        <div className="relative w-full sm:w-72">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A39E]" />
+      {showAddForm && (
+        <form
+          onSubmit={handleQuickAdd}
+          className="glass-panel flex flex-wrap items-center gap-3 rounded-2xl p-4"
+        >
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск по имени или никнейму..."
-            className="w-full rounded-lg border border-white/10 bg-[#121917] py-2 pl-9 pr-4 text-sm text-[#F4F1EA] placeholder-[#94A39E] focus:border-[#D4AF37] focus:outline-none"
+            placeholder="Имя и фамилия игрока"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="glass-well flex-1 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none"
           />
-        </div>
-      </div>
+          <input
+            type="text"
+            placeholder="Никнейм (необязательно)"
+            value={newNick}
+            onChange={(e) => setNewNick(e.target.value)}
+            className="glass-well w-56 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="btn-crimson rounded-xl px-5 py-2.5 text-xs font-bold cursor-pointer"
+          >
+            Добавить в клуб
+          </button>
+        </form>
+      )}
 
-      {/* Leaderboard Table */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-[#121917]">
+      {/* Standings Table */}
+      <div className="glass-panel overflow-hidden rounded-3xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-[#0B0F0E]/60 text-xs text-[#94A39E]">
-                <th className="py-3.5 pl-6 pr-3 font-medium">Ранг</th>
-                <th className="py-3.5 px-3 font-medium">Участник клуба</th>
-                <th className="py-3.5 px-3 font-medium">Статус отбора</th>
-                <th className="py-3.5 px-3 text-right font-medium">Турниров</th>
-                <th className="py-3.5 px-3 text-right font-medium">Побед (Топ-1)</th>
-                <th className="py-3.5 px-3 text-right font-medium">Финальных столов</th>
-                <th className="py-3.5 px-3 text-right font-medium">Запас / Отставание</th>
-                <th className="py-3.5 pl-3 pr-6 text-right font-medium">Очки сезона</th>
+              <tr className="border-b border-white/10 bg-black/30 text-xs text-slate-400">
+                <th className="py-4 pl-6 pr-3 font-medium">Место</th>
+                <th className="py-4 px-3 font-medium">Игрок</th>
+                <th className="py-4 px-3 font-medium">Статус</th>
+                <th className="py-4 px-3 text-right font-medium">Игр</th>
+                <th className="py-4 px-3 text-right font-medium">Побед</th>
+                <th className="py-4 px-3 text-right font-medium">До #10 места</th>
+                <th className="py-4 pl-3 pr-6 text-right font-medium">Очки сезона</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-white/10">
               {filteredPlayers.map((player) => {
-                const isCutoffRow = player.rank === 10 && zoneFilter === 'all' && !searchQuery;
+                const isCutoffRow = player.rank === 10 && !searchQuery;
                 return (
                   <React.Fragment key={player.id}>
                     <tr
-                      className={`transition-colors hover:bg-white/[0.03] ${
-                        player.inFinalTable ? 'bg-[#D4AF37]/[0.03]' : ''
+                      className={`transition-colors hover:bg-white/[0.04] ${
+                        player.inFinalTable ? 'bg-white/[0.02]' : ''
                       }`}
                     >
-                      <td className="font-mono-tabular py-3.5 pl-6 pr-3 font-bold">
+                      <td className="font-mono-tabular py-4 pl-6 pr-3 font-bold">
                         <span
                           className={
-                            player.rank === 1
-                              ? 'text-[#D4AF37] text-base'
+                            player.rank <= 3
+                              ? 'text-[#F43F5E] text-base'
                               : player.inFinalTable
-                                ? 'text-[#F4F1EA]'
-                                : 'text-[#94A39E]'
+                                ? 'text-white'
+                                : 'text-slate-500'
                           }
                         >
                           #{player.rank}
                         </span>
                       </td>
-                      <td className="py-3.5 px-3">
-                        <div className="font-semibold text-[#F4F1EA]">{player.name}</div>
-                        <div className="flex items-center gap-2 text-xs text-[#94A39E]">
-                          <span>{player.nickname || 'Участник клуба'}</span>
-                          {player.notes && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className="truncate max-w-xs">{player.notes}</span>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-3 text-xs">
-                        {player.inFinalTable ? (
-                          <span className="font-medium text-[#10B981]">
-                            Зона Финального стола (Топ-10)
-                          </span>
-                        ) : (
-                          <span className="text-[#94A39E]">Зона борьбы за Топ-10</span>
+                      <td className="py-4 px-3">
+                        <div className="font-semibold text-white">{player.name}</div>
+                        {player.nickname && (
+                          <div className="text-xs text-slate-400">{player.nickname}</div>
                         )}
                       </td>
-                      <td className="font-mono-tabular py-3.5 px-3 text-right text-[#F4F1EA]">
+                      <td className="py-4 px-3 text-xs">
+                        {player.inFinalTable ? (
+                          <span className="font-semibold text-emerald-400">
+                            Финальный стол (Топ-10)
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">В гонке за Топ-10</span>
+                        )}
+                      </td>
+                      <td className="font-mono-tabular py-4 px-3 text-right text-slate-300">
                         {player.gamesPlayed}
                       </td>
-                      <td className="font-mono-tabular py-3.5 px-3 text-right text-[#F4F1EA]">
+                      <td className="font-mono-tabular py-4 px-3 text-right text-slate-300">
                         {player.winsCount}
                       </td>
-                      <td className="font-mono-tabular py-3.5 px-3 text-right text-[#94A39E]">
-                        {player.finalTablesCount}
-                      </td>
-                      <td className="font-mono-tabular py-3.5 px-3 text-right text-xs">
+                      <td className="font-mono-tabular py-4 px-3 text-right text-xs">
                         {player.inFinalTable ? (
-                          <span className="text-[#10B981]">
-                            +{player.deltaToCutoff} от #10 места
-                          </span>
+                          <span className="text-emerald-400">+{player.deltaToCutoff}</span>
                         ) : (
-                          <span className="text-[#F59E0B]">
-                            −{player.deltaToCutoff} до #10 места
-                          </span>
+                          <span className="text-rose-400">−{player.deltaToCutoff}</span>
                         )}
                       </td>
-                      <td className="font-mono-tabular py-3.5 pl-3 pr-6 text-right text-base font-bold text-[#D4AF37]">
+                      <td className="font-mono-tabular py-4 pl-3 pr-6 text-right text-base font-extrabold text-white">
                         {player.seasonPoints}
                       </td>
                     </tr>
 
                     {isCutoffRow && (
-                      <tr className="bg-[#D4AF37]/10">
+                      <tr className="bg-[#E11D48]/15">
                         <td
-                          colSpan={8}
-                          className="py-2 px-6 text-center text-xs font-semibold tracking-wide text-[#D4AF37]"
+                          colSpan={7}
+                          className="py-2.5 px-6 text-center text-xs font-bold tracking-wider text-[#F43F5E]"
                         >
-                          ↑ ГРАНИЦА ОТБОРА ЗА «ФИНАЛЬНЫЙ СТОЛ СЕЗОНА» (ТОП-10 ИГРОКОВ) ↑
+                          ↑ ЗОНА ПОПАДАНИЯ ЗА «ФИНАЛЬНЫЙ СТОЛ СЕЗОНА» (ТОП-10) ↑
                         </td>
                       </tr>
                     )}
                   </React.Fragment>
                 );
               })}
-
-              {filteredPlayers.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-sm text-[#94A39E]">
-                    По вашему запросу игроки не найдены.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
