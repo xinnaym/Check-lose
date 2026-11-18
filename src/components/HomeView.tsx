@@ -260,9 +260,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-xs leading-relaxed text-slate-400">
-            <strong className="text-white">Отказ от ответственности (УК РФ):</strong> В клубе «Чек
-            это проигрыш» строго запрещена игра на реальные деньги, кэш-игры и денежные призы. Все
-            фишки используются исключительно для спортивного подсчёта очков сезонного рейтинга.
+            <strong className="text-white">Формат клуба:</strong> В клубе «Чек это проигрыш» мы
+            играем исключительно на турнирные фишки и очки сезонного рейтинга, а не на деньги.
           </div>
         </div>
 

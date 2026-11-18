@@ -143,7 +143,7 @@ export const AdminView: React.FC = () => {
                   type="password"
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="Введите ПИН-код (25000)..."
+                  placeholder="Введите ПИН-код дилера..."
                   autoFocus
                   className="glass-well w-full rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
                 />
@@ -164,17 +164,6 @@ export const AdminView: React.FC = () => {
               {authLoading ? 'Проверка доступа...' : 'Войти в Пульт дилера'}
             </button>
           </form>
-
-          <div className="border-t border-white/10 pt-4 flex items-center justify-between gap-2 text-xs text-slate-400">
-            <span>Клубный ПИН по умолчанию:</span>
-            <button
-              type="button"
-              onClick={() => setPinInput('25000')}
-              className="btn-glass rounded-lg px-2.5 py-1 font-mono-tabular font-bold text-[#F97316] hover:text-white cursor-pointer"
-            >
-              Подставить 25000
-            </button>
-          </div>
         </div>
       </div>
     );

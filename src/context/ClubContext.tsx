@@ -398,27 +398,42 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginDealer = async (pin: string) => {
     const cleanPin = (pin || '').trim().toLowerCase();
+
     if (serverAvailableRef.current) {
-      const res = await fetch('/api/admin/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.authorized) {
-        throw new Error(data.error || 'Неверный ПИН-код дилера');
-      }
       try {
-        localStorage.setItem(DEALER_TOKEN_STORAGE_KEY, data.token);
-      } catch {
-        // ignore
+        const res = await fetch('/api/admin/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+        });
+        const rawText = await res.text();
+        if (rawText.trim().startsWith('{')) {
+          const data = JSON.parse(rawText);
+          if (res.ok && data.authorized) {
+            try {
+              localStorage.setItem(DEALER_TOKEN_STORAGE_KEY, data.token);
+            } catch {
+              // ignore
+            }
+            setDealerToken(data.token);
+            setIsDealerAuthorized(true);
+            return;
+          }
+          if (res.status === 401) {
+            throw new Error(data.error || 'Неверный ПИН-код дилера');
+          }
+        } else {
+          serverAvailableRef.current = false;
+        }
+      } catch (err: any) {
+        if (err?.message === 'Неверный ПИН-код дилера') {
+          throw err;
+        }
+        serverAvailableRef.current = false;
       }
-      setDealerToken(data.token);
-      setIsDealerAuthorized(true);
-      return;
     }
 
-    // Client-side static mode auth (GitHub Pages)
+    // Client-side static mode auth (GitHub Pages / fallback)
     if (['25000', 'admin', 'check'].includes(cleanPin)) {
       const token = 'cep-dealer-token-25000';
       try {
@@ -444,32 +459,44 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const apiCall = async (url: string, options: RequestInit = {}) => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...((options.headers as Record<string, string>) || {}),
-    };
-    if (dealerToken) {
-      headers['x-dealer-token'] = dealerToken;
-    }
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...((options.headers as Record<string, string>) || {}),
+      };
+      if (dealerToken) {
+        headers['x-dealer-token'] = dealerToken;
+      }
 
-    const res = await fetch(url, {
-      ...options,
-      headers,
-    });
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
+      const res = await fetch(url, {
+        ...options,
+        headers,
+      });
+      const rawText = await res.text();
+      if (!rawText.trim().startsWith('{')) {
+        serverAvailableRef.current = false;
+        return null;
+      }
+      const data = JSON.parse(rawText);
+      if (res.status === 401) {
+        logoutDealer();
+        throw new Error(data.error || 'Требуется авторизация дилера');
+      }
+      if (!res.ok) {
+        throw new Error(data.error || 'Ошибка выполнения запроса');
+      }
+      return data;
+    } catch (err: any) {
+      if (
+        err?.message === 'Требуется авторизация дилера' ||
+        err?.message?.includes('Ошибка') ||
+        err?.message?.includes('Выберите')
+      ) {
+        throw err;
+      }
       serverAvailableRef.current = false;
       return null;
     }
-    const data = await res.json();
-    if (res.status === 401) {
-      logoutDealer();
-      throw new Error(data.error || 'Требуется авторизация дилера');
-    }
-    if (!res.ok) {
-      throw new Error(data.error || 'Ошибка выполнения запроса');
-    }
-    return data;
   };
 
   const getCurrentLevelLabel = () => {
