@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
-import { calculatePointsForPlace, PenaltyType, TableFormat } from '../types/poker.ts';
+import {
+  calculatePointsForPlace,
+  parseRegisteredPlayers,
+  PenaltyType,
+  TableFormat,
+} from '../types/poker.ts';
 import { CLUB_LOGO_PATH } from '../App.tsx';
 import {
   Play,
@@ -21,16 +26,22 @@ import {
   XCircle,
   Search,
   KeyRound,
+  Mail,
+  User,
+  Users,
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
   const {
     players,
+    announcements,
     blindLevels,
     liveState,
+    currentUser,
     isDealerAuthorized,
-    loginDealer,
-    logoutDealer,
+    loginUser,
+    registerUser,
+    logoutUser,
     controlTimer,
     eliminatePlayer,
     undoLastElimination,
@@ -43,21 +54,32 @@ export const AdminView: React.FC = () => {
     editPlayer,
   } = useClub();
 
-  const [pinInput, setPinInput] = useState('');
+  // Dealer Account Auth State
+  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [loginInput, setLoginInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [firstNameInput, setFirstNameInput] = useState('');
+  const [lastNameInput, setLastNameInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Dealer Console State
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [expandedPenaltyPlayerId, setExpandedPenaltyPlayerId] = useState<number | null>(null);
   const [nowTs, setNowTs] = useState(() => Date.now());
 
+  // Search Filters (by First Name & Last Name)
+  const [activeTableSearch, setActiveTableSearch] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [newGamePlayerSearch, setNewGamePlayerSearch] = useState('');
+
+  // New Tournament State
   const [newTitle, setNewTitle] = useState('Вечерний Холдем • Турнир #2');
   const [newFormat, setNewFormat] = useState<TableFormat>('1_table');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [quickPlayerName, setQuickPlayerName] = useState('');
 
-  const [memberSearch, setMemberSearch] = useState('');
   const [banReasonInput, setBanReasonInput] = useState<Record<number, string>>({});
 
   useEffect(() => {
@@ -89,25 +111,38 @@ export const AdminView: React.FC = () => {
     }
   };
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleDealerAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pinInput.trim()) return;
     setAuthLoading(true);
     setAuthError(null);
     try {
-      await loginDealer(pinInput.trim());
-      setPinInput('');
+      if (authTab === 'login') {
+        const user = await loginUser(loginInput.trim(), passwordInput.trim());
+        if (user.role !== 'dealer') {
+          setAuthError(
+            `Учётная запись «${user.firstName} ${user.lastName}» имеет роль Игрок. Войдите под учётной записью Дилера или создайте аккаунт дилера.`
+          );
+        }
+      } else {
+        await registerUser({
+          firstName: firstNameInput.trim(),
+          lastName: lastNameInput.trim(),
+          email: loginInput.trim(),
+          password: passwordInput.trim(),
+          role: 'dealer',
+        });
+      }
     } catch (err: any) {
-      setAuthError(err.message || 'Неверный ПИН-код дилера');
+      setAuthError(err.message || 'Неверный логин или пароль');
     } finally {
       setAuthLoading(false);
     }
   };
 
-  // --- AUTHORIZATION GATE ---
+  // --- DEALER ACCOUNT AUTHORIZATION GATE ---
   if (!isDealerAuthorized) {
     return (
-      <div className="mx-auto max-w-md py-6 sm:py-12">
+      <div className="mx-auto max-w-md py-6 sm:py-10">
         <div className="glass-panel rounded-3xl p-6 sm:p-8 text-center space-y-6">
           <div className="mx-auto relative h-24 w-24 overflow-hidden rounded-full border-2 border-[#F97316]/60 bg-black shadow-[0_0_32px_-6px_rgba(249,115,22,0.5)]">
             <img
@@ -121,30 +156,128 @@ export const AdminView: React.FC = () => {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 rounded-lg bg-[#F97316]/15 px-3 py-1 text-xs font-bold text-[#F97316]">
               <Lock className="h-3.5 w-3.5" />
-              <span>ЗАЩИЩЁННЫЙ ДОСТУП</span>
+              <span>АВТОРИЗАЦИЯ ДИЛЕРА</span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
               Пульт дилера
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Управление турнирным таймером, вылетами, штрафами и банами доступно только
-              авторизованному дилеру клуба.
+              Войдите под личной учётной записью дилера клуба для управления таймером, рассадкой,
+              штрафами и бан-листом.
             </p>
           </div>
 
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
+          {currentUser && currentUser.role !== 'dealer' && (
+            <div className="rounded-2xl border border-amber-400/40 bg-amber-400/10 p-3.5 text-left text-xs text-amber-200 space-y-2">
+              <div>
+                Вы вошли как игрок:{' '}
+                <strong className="text-white">
+                  {currentUser.firstName} {currentUser.lastName}
+                </strong>
+              </div>
+              <button
+                type="button"
+                onClick={logoutUser}
+                className="btn-glass rounded-lg px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
+              >
+                Выйти и войти под аккаунтом дилера
+              </button>
+            </div>
+          )}
+
+          {/* Switch between Dealer Login and Dealer Account Registration */}
+          <div className="glass-well flex items-center gap-1 rounded-xl p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthTab('login');
+                setAuthError(null);
+              }}
+              className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
+                authTab === 'login' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Вход дилера
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthTab('register');
+                setAuthError(null);
+              }}
+              className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
+                authTab === 'register' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Регистрация дилера
+            </button>
+          </div>
+
+          <form onSubmit={handleDealerAuthSubmit} className="space-y-4 text-left">
+            {authTab === 'register' && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Имя дилера *
+                  </label>
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={firstNameInput}
+                      onChange={(e) => setFirstNameInput(e.target.value)}
+                      placeholder="Имя"
+                      className="glass-well w-full rounded-xl py-2.5 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Фамилия *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={lastNameInput}
+                    onChange={(e) => setLastNameInput(e.target.value)}
+                    placeholder="Фамилия"
+                    className="glass-well w-full rounded-xl py-2.5 px-3 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                ПИН-код или пароль дилера
+                Логин или Email учётной записи *
+              </label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  value={loginInput}
+                  onChange={(e) => setLoginInput(e.target.value)}
+                  placeholder="Логин или email дилера..."
+                  autoFocus
+                  className="glass-well w-full rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Пароль *
               </label>
               <div className="relative">
                 <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="Введите ПИН-код дилера..."
-                  autoFocus
+                  required
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Введите пароль..."
                   className="glass-well w-full rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
                 />
               </div>
@@ -158,10 +291,14 @@ export const AdminView: React.FC = () => {
 
             <button
               type="submit"
-              disabled={authLoading || !pinInput.trim()}
+              disabled={authLoading}
               className="btn-crimson w-full rounded-xl py-3 text-sm font-extrabold disabled:opacity-40 cursor-pointer"
             >
-              {authLoading ? 'Проверка доступа...' : 'Войти в Пульт дилера'}
+              {authLoading
+                ? 'Проверка учётной записи...'
+                : authTab === 'login'
+                  ? 'Войти в Пульт дилера'
+                  : 'Зарегистрировать дилера и войти'}
             </button>
           </form>
         </div>
@@ -198,6 +335,32 @@ export const AdminView: React.FC = () => {
     return formatClock(diffSec);
   };
 
+  const matchesNameOrSurname = (fullName: string, nickname: string, query: string) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    const parts = q.split(/\s+/);
+    const target = `${fullName} ${nickname}`.toLowerCase();
+    return parts.every((part) => target.includes(part));
+  };
+
+  const filteredActiveTablePlayers = useMemo(() => {
+    return liveState.activePlayers.filter((p) =>
+      matchesNameOrSurname(p.name, p.nickname, activeTableSearch)
+    );
+  }, [liveState.activePlayers, activeTableSearch]);
+
+  const filteredClubMembers = useMemo(() => {
+    return players.filter((p) =>
+      matchesNameOrSurname(p.name, p.nickname, memberSearch)
+    );
+  }, [players, memberSearch]);
+
+  const filteredNewGamePlayers = useMemo(() => {
+    return players.filter((p) =>
+      matchesNameOrSurname(p.name, p.nickname, newGamePlayerSearch)
+    );
+  }, [players, newGamePlayerSearch]);
+
   const toggleSelect = (id: number) => {
     const targetPlayer = players.find((p) => p.id === id);
     if (targetPlayer?.isBanned) {
@@ -207,6 +370,33 @@ export const AdminView: React.FC = () => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  };
+
+  const handleLoadRegisteredFromTable = (announcementId: number) => {
+    const targetTable = announcements.find((a) => a.id === announcementId);
+    if (!targetTable) return;
+    const regList = parseRegisteredPlayers(targetTable.registeredPlayersJson);
+    const matchedIds = players
+      .filter(
+        (p) =>
+          !p.isBanned &&
+          regList.some(
+            (r) =>
+              r.playerId === p.id || r.name.toLowerCase() === p.name.toLowerCase()
+          )
+      )
+      .map((p) => p.id);
+
+    setNewTitle(targetTable.title);
+    setNewFormat(targetTable.spotsTotal > 10 ? '2_tables' : '1_table');
+    if (matchedIds.length > 0) {
+      setSelectedIds(matchedIds);
+      showNotice(
+        `Загружено ${matchedIds.length} записавшихся участников со стола «${targetTable.title}»`
+      );
+    } else {
+      showNotice('За этим столом пока нет записавшихся участников');
+    }
   };
 
   const handleQuickCreatePlayer = async (e: React.FormEvent) => {
@@ -236,12 +426,6 @@ export const AdminView: React.FC = () => {
     }, labels[type]);
   };
 
-  const filteredClubMembers = players.filter(
-    (p) =>
-      p.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-      p.nickname.toLowerCase().includes(memberSearch.toLowerCase())
-  );
-
   return (
     <div className="space-y-6 sm:space-y-8 pb-16">
       {toast && (
@@ -262,14 +446,14 @@ export const AdminView: React.FC = () => {
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="text-xs font-bold text-[#F97316]">
-                ПУЛЬТ ДИЛЕРА · АВТОРИЗОВАН
+                ПУЛЬТ ДИЛЕРА · {currentUser?.firstName} {currentUser?.lastName}
               </span>
               <button
-                onClick={logoutDealer}
+                onClick={logoutUser}
                 className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:text-white cursor-pointer"
               >
                 <LogOut className="h-3 w-3 text-[#F97316]" />
-                <span>Выйти</span>
+                <span>Сменить аккаунт</span>
               </button>
             </div>
             <h1 className="font-display text-xl font-extrabold text-white sm:text-3xl">
@@ -340,21 +524,33 @@ export const AdminView: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. ACTIVE PLAYERS, ONE-CLICK ELIMINATION & TABLE PENALTIES/BANS */}
+      {/* 2. ACTIVE PLAYERS, SEARCH BY NAME/SURNAME, ONE-CLICK ELIMINATION & TABLE PENALTIES */}
       <div className="glass-panel rounded-3xl p-5 sm:p-8">
-        <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center">
+        <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-center">
           <div>
             <h2 className="font-display text-xl sm:text-2xl font-bold text-white">
               Игроки за столом ({liveState.activePlayers.length})
             </h2>
             <p className="mt-1 text-xs text-slate-400">
               «Выбыл» выдаёт <strong className="text-white">#{nextElimPlace} место</strong> (
-              <strong className="text-emerald-400">+{nextElimPoints} очк.</strong>) · «Штраф / Бан»
-              наказывает за показ карт, чек с натсом или сговор
+              <strong className="text-emerald-400">+{nextElimPoints} очк.</strong>) · Поиск игрока
+              по имени и фамилии
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Search active table players by First Name & Last Name */}
+            <div className="relative w-full sm:w-60">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={activeTableSearch}
+                onChange={(e) => setActiveTableSearch(e.target.value)}
+                placeholder="Имя или фамилия за столом..."
+                className="glass-well w-full rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-slate-400 focus:border-[#F97316] focus:outline-none"
+              />
+            </div>
+
             <button
               disabled={busy || liveState.activePlayers.length < 2}
               onClick={() =>
@@ -382,7 +578,7 @@ export const AdminView: React.FC = () => {
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-          {liveState.activePlayers.map((player) => {
+          {filteredActiveTablePlayers.map((player) => {
             const isPenaltyOpen = expandedPenaltyPlayerId === player.playerId;
             const banTimer = formatBanCountdown(player.penaltyExpiresAt);
             const hasActivePenalty = Boolean(player.penaltyNote || banTimer);
@@ -562,6 +758,12 @@ export const AdminView: React.FC = () => {
             );
           })}
 
+          {liveState.activePlayers.length > 0 && filteredActiveTablePlayers.length === 0 && (
+            <div className="col-span-full py-6 text-center text-xs text-slate-400">
+              За столом не найдено игроков по запросу «{activeTableSearch}»
+            </div>
+          )}
+
           {liveState.activePlayers.length === 0 && (
             <div className="col-span-full py-8 text-center text-sm font-bold text-emerald-400">
               Турнир завершён! Все очки начислены в рейтинг. Запустите следующую игру ниже.
@@ -570,7 +772,7 @@ export const AdminView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. CLUB-WIDE PENALTIES & BAN LIST MANAGEMENT */}
+      {/* 3. CLUB-WIDE PENALTIES & BAN LIST MANAGEMENT WITH SEARCH BY FIRST/LAST NAME */}
       <div className="glass-panel rounded-3xl p-5 sm:p-8">
         <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center">
           <div>
@@ -579,20 +781,20 @@ export const AdminView: React.FC = () => {
               <span>ДИСЦИПЛИНАРНЫЙ КОНТРОЛЬ КЛУБА</span>
             </div>
             <h2 className="font-display mt-1 text-xl sm:text-2xl font-bold text-white">
-              Штрафы и бан участников ({players.length})
+              Поиск по игрокам: штрафы и бан ({filteredClubMembers.length})
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Забаненные игроки не допускаются к посадке за стол в новых турнирах до снятия бана
+              Введите имя или фамилию участника для быстрого начисления штрафа или блокировки
             </p>
           </div>
 
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-72">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={memberSearch}
               onChange={(e) => setMemberSearch(e.target.value)}
-              placeholder="Поиск участника..."
+              placeholder="Поиск по имени и фамилии..."
               className="glass-well w-full rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-400 focus:border-[#F97316] focus:outline-none"
             />
           </div>
@@ -742,10 +944,16 @@ export const AdminView: React.FC = () => {
               </div>
             );
           })}
+
+          {filteredClubMembers.length === 0 && (
+            <div className="col-span-full py-6 text-center text-xs text-slate-400">
+              Игроки по запросу «{memberSearch}» не найдены
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 4. START NEW EVENING GAME (1 OR 2 TABLES) */}
+      {/* 4. START NEW EVENING GAME (1 OR 2 TABLES) WITH TABLE REGISTRATIONS & NAME SEARCH */}
       <div className="glass-panel rounded-3xl p-5 sm:p-8">
         <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center">
           <div>
@@ -753,17 +961,17 @@ export const AdminView: React.FC = () => {
               Запустить новый турнир вечера
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Стартовый стек 25 000 фишек · Автоматическая рассадка по столам и боксам
+              Загрузите записавшихся на стол с сайта или отметьте игроков вручную через поиск
             </p>
           </div>
 
           <form onSubmit={handleQuickCreatePlayer} className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Имя нового игрока..."
+              placeholder="Имя и фамилия нового игрока..."
               value={quickPlayerName}
               onChange={(e) => setQuickPlayerName(e.target.value)}
-              className="glass-well flex-1 sm:w-48 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none"
+              className="glass-well flex-1 sm:w-52 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none"
             />
             <button
               type="submit"
@@ -774,6 +982,34 @@ export const AdminView: React.FC = () => {
             </button>
           </form>
         </div>
+
+        {/* One-Click Load Registered Players from Website Evening Tables */}
+        {announcements.length > 0 && (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#F97316]">
+              <Users className="h-3.5 w-3.5" />
+              <span>ЗАПИСАВШИЕСЯ НА СТОЛЫ ЧЕРЕЗ САЙТ:</span>
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              {announcements.map((table, idx) => {
+                const count = parseRegisteredPlayers(table.registeredPlayersJson).length;
+                return (
+                  <button
+                    key={table.id}
+                    type="button"
+                    onClick={() => handleLoadRegisteredFromTable(table.id)}
+                    className="btn-glass inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold text-white hover:border-[#F97316]/50 cursor-pointer"
+                  >
+                    <span>Стол #{idx + 1}: {table.title.split('•')[1] || table.title}</span>
+                    <span className="font-mono-tabular rounded-md bg-[#F97316] px-1.5 py-0.5 text-[10px] font-extrabold text-black">
+                      {count} чел.
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
@@ -828,11 +1064,26 @@ export const AdminView: React.FC = () => {
         </div>
 
         <div className="mt-5">
-          <div className="text-xs font-semibold text-slate-300">
-            Отметьте участников на вечер ({selectedIds.length} выбрано):
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="text-xs font-semibold text-slate-300">
+              Отметьте участников на вечер ({selectedIds.length} выбрано):
+            </div>
+
+            {/* Search players by First Name & Last Name when assembling table */}
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={newGamePlayerSearch}
+                onChange={(e) => setNewGamePlayerSearch(e.target.value)}
+                placeholder="Фильтр по имени и фамилии..."
+                className="glass-well w-full rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-slate-400 focus:border-[#F97316] focus:outline-none"
+              />
+            </div>
           </div>
+
           <div className="mt-3 grid grid-cols-1 gap-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
-            {players.map((p) => {
+            {filteredNewGamePlayers.map((p) => {
               const active = selectedIds.includes(p.id) && !p.isBanned;
               return (
                 <button

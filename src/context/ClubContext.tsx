@@ -6,14 +6,57 @@ import {
   ClubContentRecord,
   LivePenaltyLog,
   LiveTournamentState,
+  parseRegisteredPlayers,
   PenaltyType,
   PlayerRecord,
   TableFormat,
+  TableRegisteredPlayer,
   TournamentArchiveRecord,
+  UserAccount,
+  UserRole,
 } from '../types/poker.ts';
 
-const DEALER_TOKEN_STORAGE_KEY = 'cep_dealer_token';
-const STATIC_STATE_STORAGE_KEY = 'cep_static_club_state_v2';
+const AUTH_USER_STORAGE_KEY = 'cep_auth_user_v1';
+const AUTH_TOKEN_STORAGE_KEY = 'cep_auth_token_v1';
+const STATIC_USERS_STORAGE_KEY = 'cep_static_users_v1';
+const STATIC_STATE_STORAGE_KEY = 'cep_static_club_state_v3';
+
+interface StoredStaticUser extends UserAccount {
+  passwordHash: string;
+}
+
+const DEFAULT_STATIC_USERS: StoredStaticUser[] = [
+  {
+    id: 1,
+    uid: 'dealer-main',
+    email: 'dealer',
+    firstName: 'Главный',
+    lastName: 'Дилер',
+    passwordHash: 'dealer25000',
+    role: 'dealer',
+    playerId: null,
+  },
+  {
+    id: 2,
+    uid: 'dealer-email',
+    email: 'dealer@checkclub.ru',
+    firstName: 'Главный',
+    lastName: 'Дилер',
+    passwordHash: 'dealer25000',
+    role: 'dealer',
+    playerId: null,
+  },
+  {
+    id: 3,
+    uid: 'player-1',
+    email: 'lekalin@checkclub.ru',
+    firstName: 'Илья',
+    lastName: 'Лекалин',
+    passwordHash: '25000',
+    role: 'dealer',
+    playerId: 1,
+  },
+];
 
 const INITIAL_PLAYERS: PlayerRecord[] = [
   { id: 1, name: 'Илья Лекалин', nickname: 'Shark_IL', seasonPoints: 1140, gamesPlayed: 8, winsCount: 3, finalTablesCount: 7, penaltiesCount: 0, isBanned: false, banReason: '', notes: 'Лидер текущего сезона' },
@@ -41,7 +84,15 @@ const INITIAL_ANNOUNCEMENTS: AnnouncementRecord[] = [
     description: 'Открывающий турнир игрового вечера по правилам спортивного Техасского Холдема. Начисление очков по Шаблону A (1 место — 150 очков).',
     status: 'registration',
     spotsTotal: 10,
-    spotsTaken: 8,
+    spotsTaken: 6,
+    registeredPlayersJson: JSON.stringify([
+      { playerId: 1, name: 'Илья Лекалин', nickname: 'Shark_IL' },
+      { playerId: 2, name: 'Дмитрий Воронов', nickname: 'Raven' },
+      { playerId: 3, name: 'Александр Соколов', nickname: 'Falcon' },
+      { playerId: 4, name: 'Максим Волков', nickname: 'GreyWolf' },
+      { playerId: 5, name: 'Илья Морозов', nickname: 'Frost' },
+      { playerId: 6, name: 'Евгений Козлов', nickname: 'Architect' },
+    ]),
   },
   {
     id: 2,
@@ -51,7 +102,17 @@ const INITIAL_ANNOUNCEMENTS: AnnouncementRecord[] = [
     description: 'Основной рейтинговый турнир вечера с объединением в финальный стол. Повышенная сетка очков по Шаблону B (1 место — 280 очков).',
     status: 'registration',
     spotsTotal: 20,
-    spotsTaken: 16,
+    spotsTaken: 8,
+    registeredPlayersJson: JSON.stringify([
+      { playerId: 1, name: 'Илья Лекалин', nickname: 'Shark_IL' },
+      { playerId: 2, name: 'Дмитрий Воронов', nickname: 'Raven' },
+      { playerId: 3, name: 'Александр Соколов', nickname: 'Falcon' },
+      { playerId: 4, name: 'Максим Волков', nickname: 'GreyWolf' },
+      { playerId: 7, name: 'Роман Лебедев', nickname: 'CheckRaise' },
+      { playerId: 8, name: 'Сергей Новиков', nickname: 'Novik' },
+      { playerId: 9, name: 'Кирилл Павлов', nickname: 'K_Ace' },
+      { playerId: 10, name: 'Никита Семёнов', nickname: 'AllIn_Nik' },
+    ]),
   },
   {
     id: 3,
@@ -61,7 +122,13 @@ const INITIAL_ANNOUNCEMENTS: AnnouncementRecord[] = [
     description: 'Заключительный динамичный турнир вечера для самых стойких стратегов клуба. Начисление очков в сезонный рейтинг по Шаблону A.',
     status: 'upcoming',
     spotsTotal: 10,
-    spotsTaken: 6,
+    spotsTaken: 4,
+    registeredPlayersJson: JSON.stringify([
+      { playerId: 1, name: 'Илья Лекалин', nickname: 'Shark_IL' },
+      { playerId: 5, name: 'Илья Морозов', nickname: 'Frost' },
+      { playerId: 7, name: 'Роман Лебедев', nickname: 'CheckRaise' },
+      { playerId: 11, name: 'Андрей Голубев', nickname: 'Vegas' },
+    ]),
   },
 ];
 
@@ -133,6 +200,29 @@ function sortPlayers(list: PlayerRecord[]): PlayerRecord[] {
   );
 }
 
+function getStoredStaticUsers(): StoredStaticUser[] {
+  try {
+    const raw = localStorage.getItem(STATIC_USERS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_STATIC_USERS;
+}
+
+function saveStoredStaticUsers(list: StoredStaticUser[]) {
+  try {
+    localStorage.setItem(STATIC_USERS_STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // ignore
+  }
+}
+
 interface ClubContextValue {
   players: PlayerRecord[];
   announcements: AnnouncementRecord[];
@@ -143,9 +233,23 @@ interface ClubContextValue {
   loading: boolean;
   error: string | null;
   wsConnected: boolean;
+  currentUser: UserAccount | null;
   isDealerAuthorized: boolean;
-  loginDealer: (pin: string) => Promise<void>;
-  logoutDealer: () => void;
+  authModalOpen: boolean;
+  authModalMode: 'login' | 'register';
+  openAuthModal: (mode?: 'login' | 'register') => void;
+  closeAuthModal: () => void;
+  loginUser: (login: string, password: string) => Promise<UserAccount>;
+  registerUser: (data: {
+    firstName: string;
+    lastName: string;
+    nickname?: string;
+    email: string;
+    password: string;
+    role?: UserRole;
+  }) => Promise<UserAccount>;
+  logoutUser: () => void;
+  toggleTableRegistration: (announcementId: number) => Promise<boolean>;
   refreshAll: () => Promise<void>;
   controlTimer: (action: 'start' | 'pause' | 'next_level' | 'prev_level' | 'reset_level' | 'add_minute') => Promise<void>;
   eliminatePlayer: (playerId: number) => Promise<void>;
@@ -184,7 +288,21 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return sortPlayers(INITIAL_PLAYERS);
   });
 
-  const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>(INITIAL_ANNOUNCEMENTS);
+  const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(STATIC_STATE_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.announcements) && parsed.announcements.length > 0) {
+          return parsed.announcements;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return INITIAL_ANNOUNCEMENTS;
+  });
+
   const [clubContent, setClubContent] = useState<ClubContentRecord[]>([]);
   const [blindLevels, setBlindLevels] = useState<BlindLevelRecord[]>(INITIAL_BLIND_LEVELS);
   const [tournaments, setTournaments] = useState<TournamentArchiveRecord[]>([]);
@@ -206,39 +324,75 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [wsConnected, setWsConnected] = useState<boolean>(false);
-  const [dealerToken, setDealerToken] = useState<string | null>(() => {
+
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
-      return localStorage.getItem(DEALER_TOKEN_STORAGE_KEY);
+      const raw = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   });
-  const [isDealerAuthorized, setIsDealerAuthorized] = useState<boolean>(Boolean(dealerToken));
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
 
-  // Tracks whether the Node.js /api/* backend is reachable (false on GitHub Pages)
+  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+
+  const isDealerAuthorized = currentUser?.role === 'dealer';
+
   const serverAvailableRef = useRef<boolean>(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
 
-  // Persist state to localStorage for GitHub Pages / static mode & cross-tab sync
+  const openAuthModal = (mode: 'login' | 'register' = 'login') => {
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setAuthModalOpen(false);
+  };
+
+  const saveSessionUser = (user: UserAccount | null, token: string | null) => {
+    setCurrentUser(user);
+    setAuthToken(token);
+    try {
+      if (user && token) {
+        localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
+        localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+      } else {
+        localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+        localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(
         STATIC_STATE_STORAGE_KEY,
-        JSON.stringify({ players, liveState, blindLevels })
+        JSON.stringify({ players, announcements, liveState, blindLevels })
       );
     } catch {
       // ignore
     }
-  }, [players, liveState, blindLevels]);
+  }, [players, announcements, liveState, blindLevels]);
 
-  // Listen to storage events so multiple tabs on GitHub Pages stay in sync
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STATIC_STATE_STORAGE_KEY && e.newValue && !serverAvailableRef.current) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (parsed.players) setPlayers(sortPlayers(parsed.players));
+          if (parsed.announcements) setAnnouncements(parsed.announcements);
           if (parsed.liveState) setLiveState(parsed.liveState);
         } catch {
           // ignore
@@ -249,7 +403,6 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  // Client-side 1-second tournament clock when running on static hosting (GitHub Pages)
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (serverAvailableRef.current) return;
@@ -308,14 +461,13 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshAll = useCallback(async () => {
     try {
       const res = await fetch('/api/bootstrap');
-      const contentType = res.headers.get('content-type') || '';
-      if (!res.ok || !contentType.includes('application/json')) {
-        // Static hosting mode (e.g., GitHub Pages) — use local state with zero error
+      const rawText = await res.text();
+      if (!res.ok || !rawText.trim().startsWith('{')) {
         serverAvailableRef.current = false;
         setError(null);
         return;
       }
-      const data = await res.json();
+      const data = JSON.parse(rawText);
       serverAvailableRef.current = true;
       if (data.players) setPlayers(data.players);
       if (data.announcements) setAnnouncements(data.announcements);
@@ -325,7 +477,6 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.liveState) setLiveState(data.liveState);
       setError(null);
     } catch {
-      // Static hosting mode (e.g., GitHub Pages) — silently run in autonomous client mode
       serverAvailableRef.current = false;
       setError(null);
     } finally {
@@ -396,66 +547,175 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [refreshAll]);
 
-  const loginDealer = async (pin: string) => {
-    const cleanPin = (pin || '').trim().toLowerCase();
+  const loginUser = async (login: string, password: string): Promise<UserAccount> => {
+    const cleanLogin = login.trim().toLowerCase();
+    const cleanPass = password.trim();
 
     if (serverAvailableRef.current) {
       try {
-        const res = await fetch('/api/admin/auth/login', {
+        const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin }),
+          body: JSON.stringify({ login: cleanLogin, password: cleanPass }),
         });
         const rawText = await res.text();
         if (rawText.trim().startsWith('{')) {
           const data = JSON.parse(rawText);
-          if (res.ok && data.authorized) {
-            try {
-              localStorage.setItem(DEALER_TOKEN_STORAGE_KEY, data.token);
-            } catch {
-              // ignore
-            }
-            setDealerToken(data.token);
-            setIsDealerAuthorized(true);
-            return;
+          if (res.ok && data.user) {
+            saveSessionUser(data.user, data.token || data.user.uid);
+            return data.user;
           }
-          if (res.status === 401) {
-            throw new Error(data.error || 'Неверный ПИН-код дилера');
+          if (res.status === 401 || res.status === 400) {
+            throw new Error(data.error || 'Неверный логин/Email или пароль');
           }
         } else {
           serverAvailableRef.current = false;
         }
       } catch (err: any) {
-        if (err?.message === 'Неверный ПИН-код дилера') {
+        if (err?.message?.includes('Неверный') || err?.message?.includes('Введите')) {
           throw err;
         }
         serverAvailableRef.current = false;
       }
     }
 
-    // Client-side static mode auth (GitHub Pages / fallback)
-    if (['25000', 'admin', 'check'].includes(cleanPin)) {
-      const token = 'cep-dealer-token-25000';
-      try {
-        localStorage.setItem(DEALER_TOKEN_STORAGE_KEY, token);
-      } catch {
-        // ignore
-      }
-      setDealerToken(token);
-      setIsDealerAuthorized(true);
-      return;
+    // Static / GitHub Pages account login
+    const staticUsers = getStoredStaticUsers();
+    const matched = staticUsers.find(
+      (u) =>
+        (u.email.toLowerCase() === cleanLogin ||
+          `${u.firstName} ${u.lastName}`.toLowerCase() === cleanLogin) &&
+        u.passwordHash === cleanPass
+    );
+
+    if (!matched) {
+      throw new Error('Неверный логин/Email или пароль');
     }
-    throw new Error('Неверный ПИН-код дилера');
+
+    const account: UserAccount = {
+      id: matched.id,
+      uid: matched.uid,
+      email: matched.email,
+      firstName: matched.firstName,
+      lastName: matched.lastName,
+      role: matched.role,
+      playerId: matched.playerId,
+    };
+    saveSessionUser(account, account.uid);
+    return account;
   };
 
-  const logoutDealer = () => {
-    try {
-      localStorage.removeItem(DEALER_TOKEN_STORAGE_KEY);
-    } catch {
-      // ignore
+  const registerUser = async (payload: {
+    firstName: string;
+    lastName: string;
+    nickname?: string;
+    email: string;
+    password: string;
+    role?: UserRole;
+  }): Promise<UserAccount> => {
+    const firstName = payload.firstName.trim();
+    const lastName = payload.lastName.trim();
+    const email = payload.email.trim().toLowerCase();
+    const password = payload.password.trim();
+    const nickname = (payload.nickname || '').trim();
+    const role: UserRole = payload.role === 'dealer' ? 'dealer' : 'player';
+
+    if (!firstName || !lastName) {
+      throw new Error('Укажите ваши имя и фамилию');
     }
-    setDealerToken(null);
-    setIsDealerAuthorized(false);
+    if (!email || !password) {
+      throw new Error('Укажите логин/Email и пароль');
+    }
+
+    if (serverAvailableRef.current) {
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firstName, lastName, nickname, email, password, role }),
+        });
+        const rawText = await res.text();
+        if (rawText.trim().startsWith('{')) {
+          const data = JSON.parse(rawText);
+          if (res.ok && data.user) {
+            if (data.players) setPlayers(data.players);
+            saveSessionUser(data.user, data.token || data.user.uid);
+            return data.user;
+          }
+          if (res.status === 400) {
+            throw new Error(data.error || 'Ошибка регистрации');
+          }
+        } else {
+          serverAvailableRef.current = false;
+        }
+      } catch (err: any) {
+        if (
+          err?.message?.includes('уже зарегистрирован') ||
+          err?.message?.includes('Укажите') ||
+          err?.message?.includes('Пароль')
+        ) {
+          throw err;
+        }
+        serverAvailableRef.current = false;
+      }
+    }
+
+    // Static / GitHub Pages account registration
+    const staticUsers = getStoredStaticUsers();
+    if (staticUsers.some((u) => u.email.toLowerCase() === email)) {
+      throw new Error('Пользователь с таким логином или Email уже зарегистрирован');
+    }
+
+    const fullName = `${firstName} ${lastName}`.trim();
+    let linkedPlayer = players.find(
+      (p) => p.name.toLowerCase() === fullName.toLowerCase()
+    );
+
+    if (!linkedPlayer) {
+      linkedPlayer = {
+        id: Date.now(),
+        name: fullName,
+        nickname,
+        seasonPoints: 0,
+        gamesPlayed: 0,
+        winsCount: 0,
+        finalTablesCount: 0,
+        penaltiesCount: 0,
+        isBanned: false,
+        banReason: '',
+        notes: 'Участник клуба',
+      };
+      setPlayers((prev) => sortPlayers([...prev, linkedPlayer!]));
+    }
+
+    const newStoredUser: StoredStaticUser = {
+      id: Date.now(),
+      uid: `user-${Date.now()}`,
+      email,
+      firstName,
+      lastName,
+      passwordHash: password,
+      role,
+      playerId: linkedPlayer.id,
+    };
+
+    saveStoredStaticUsers([...staticUsers, newStoredUser]);
+
+    const account: UserAccount = {
+      id: newStoredUser.id,
+      uid: newStoredUser.uid,
+      email: newStoredUser.email,
+      firstName: newStoredUser.firstName,
+      lastName: newStoredUser.lastName,
+      role: newStoredUser.role,
+      playerId: newStoredUser.playerId,
+    };
+    saveSessionUser(account, account.uid);
+    return account;
+  };
+
+  const logoutUser = () => {
+    saveSessionUser(null, null);
   };
 
   const apiCall = async (url: string, options: RequestInit = {}) => {
@@ -464,8 +724,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'Content-Type': 'application/json',
         ...((options.headers as Record<string, string>) || {}),
       };
-      if (dealerToken) {
-        headers['x-dealer-token'] = dealerToken;
+      if (authToken) {
+        headers['x-auth-token'] = authToken;
       }
 
       const res = await fetch(url, {
@@ -478,9 +738,8 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
       const data = JSON.parse(rawText);
-      if (res.status === 401) {
-        logoutDealer();
-        throw new Error(data.error || 'Требуется авторизация дилера');
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(data.error || 'Доступ запрещён');
       }
       if (!res.ok) {
         throw new Error(data.error || 'Ошибка выполнения запроса');
@@ -488,7 +747,9 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return data;
     } catch (err: any) {
       if (
-        err?.message === 'Требуется авторизация дилера' ||
+        err?.message?.includes('Доступ') ||
+        err?.message?.includes('Запись') ||
+        err?.message?.includes('заняты') ||
         err?.message?.includes('Ошибка') ||
         err?.message?.includes('Выберите')
       ) {
@@ -497,6 +758,78 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       serverAvailableRef.current = false;
       return null;
     }
+  };
+
+  const toggleTableRegistration = async (announcementId: number): Promise<boolean> => {
+    if (!currentUser) {
+      openAuthModal('login');
+      return false;
+    }
+
+    const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
+    const linkedPlayer = players.find(
+      (p) =>
+        (currentUser.playerId && p.id === currentUser.playerId) ||
+        p.name.toLowerCase() === fullName.toLowerCase()
+    );
+
+    if (linkedPlayer?.isBanned) {
+      throw new Error(`Запись недоступна: игрок ${linkedPlayer.name} находится в бан-листе клуба`);
+    }
+
+    if (serverAvailableRef.current) {
+      const data = await apiCall(`/api/tables/${announcementId}/register`, {
+        method: 'POST',
+        body: JSON.stringify({
+          playerId: linkedPlayer?.id || currentUser.playerId,
+          playerName: fullName,
+          nickname: linkedPlayer?.nickname || '',
+        }),
+      });
+      if (data?.announcements) {
+        setAnnouncements(data.announcements);
+        if (data.players) setPlayers(data.players);
+        return Boolean(data.registered);
+      }
+    }
+
+    // Static / GitHub Pages table registration fallback
+    const playerEntry: TableRegisteredPlayer = {
+      playerId: linkedPlayer?.id || currentUser.playerId || currentUser.id,
+      name: linkedPlayer?.name || fullName,
+      nickname: linkedPlayer?.nickname || '',
+    };
+
+    let isNowRegistered = false;
+    setAnnouncements((prev) =>
+      prev.map((item) => {
+        if (item.id !== announcementId) return item;
+        const currentList = parseRegisteredPlayers(item.registeredPlayersJson);
+        const existingIdx = currentList.findIndex(
+          (r) =>
+            r.playerId === playerEntry.playerId ||
+            r.name.toLowerCase() === playerEntry.name.toLowerCase()
+        );
+        let nextList: TableRegisteredPlayer[];
+        if (existingIdx !== -1) {
+          nextList = currentList.filter((_, idx) => idx !== existingIdx);
+          isNowRegistered = false;
+        } else {
+          if (currentList.length >= item.spotsTotal) {
+            throw new Error('За этим столом уже заняты все места');
+          }
+          nextList = [...currentList, playerEntry];
+          isNowRegistered = true;
+        }
+        return {
+          ...item,
+          spotsTaken: nextList.length,
+          registeredPlayersJson: JSON.stringify(nextList),
+        };
+      })
+    );
+
+    return isNowRegistered;
   };
 
   const getCurrentLevelLabel = () => {
@@ -520,7 +853,6 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Static / GitHub Pages fallback
     setLiveState((prev) => {
       const next = { ...prev, lastUpdated: Date.now() };
       const currentLvl = blindLevels[prev.currentLevelIndex] || blindLevels[0];
@@ -568,7 +900,6 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Static / GitHub Pages fallback
     const targetIndex = liveState.activePlayers.findIndex((p) => p.playerId === playerId);
     if (targetIndex === -1) return;
 
@@ -661,7 +992,6 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Static / GitHub Pages fallback
     if (liveState.eliminatedPlayers.length === 0) return;
     const lastEntry = liveState.eliminatedPlayers[0];
     setLiveState((prev) => ({
@@ -716,7 +1046,6 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Static / GitHub Pages fallback
     const target = liveState.activePlayers.find((p) => p.playerId === playerId);
     if (!target) return;
 
@@ -1001,9 +1330,16 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         error,
         wsConnected,
+        currentUser,
         isDealerAuthorized,
-        loginDealer,
-        logoutDealer,
+        authModalOpen,
+        authModalMode,
+        openAuthModal,
+        closeAuthModal,
+        loginUser,
+        registerUser,
+        logoutUser,
+        toggleTableRegistration,
         refreshAll,
         controlTimer,
         eliminatePlayer,

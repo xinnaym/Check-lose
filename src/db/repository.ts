@@ -6,16 +6,21 @@ import {
   clubContent,
   players,
   tournaments,
+  users,
 } from './schema.ts';
 import {
   AnnouncementRecord,
   BlindLevelRecord,
   ClubContentRecord,
   LiveTournamentState,
+  parseRegisteredPlayers,
   PlayerRecord,
   TableFormat,
+  TableRegisteredPlayer,
   TournamentArchiveRecord,
   TournamentResultEntry,
+  UserAccount,
+  UserRole,
 } from '../types/poker.ts';
 
 // Local fallback data when running `npm run dev` locally without Cloud SQL socket
@@ -36,6 +41,43 @@ let localPlayers: PlayerRecord[] = [
   { id: 14, name: 'Денис Богданов', nickname: 'RiverKing', seasonPoints: 395, gamesPlayed: 6, winsCount: 0, finalTablesCount: 2, penaltiesCount: 0, isBanned: false, banReason: '', notes: 'Регуляр пятничных серий' },
 ];
 
+interface LocalUserStored extends UserAccount {
+  passwordHash: string;
+}
+
+let localUsers: LocalUserStored[] = [
+  {
+    id: 1,
+    uid: 'dealer-main',
+    email: 'dealer',
+    firstName: 'Главный',
+    lastName: 'Дилер',
+    passwordHash: 'dealer25000',
+    role: 'dealer',
+    playerId: null,
+  },
+  {
+    id: 2,
+    uid: 'dealer-email',
+    email: 'dealer@checkclub.ru',
+    firstName: 'Главный',
+    lastName: 'Дилер',
+    passwordHash: 'dealer25000',
+    role: 'dealer',
+    playerId: null,
+  },
+  {
+    id: 3,
+    uid: 'player-1',
+    email: 'lekalin@checkclub.ru',
+    firstName: 'Илья',
+    lastName: 'Лекалин',
+    passwordHash: '25000',
+    role: 'dealer',
+    playerId: 1,
+  },
+];
+
 let localAnnouncements: AnnouncementRecord[] = [
   {
     id: 1,
@@ -45,7 +87,15 @@ let localAnnouncements: AnnouncementRecord[] = [
     description: 'Открывающий турнир игрового вечера по правилам спортивного Техасского Холдема. Начисление очков по Шаблону A (1 место — 150 очков).',
     status: 'registration',
     spotsTotal: 10,
-    spotsTaken: 8,
+    spotsTaken: 6,
+    registeredPlayersJson: JSON.stringify([
+      { playerId: 1, name: 'Илья Лекалин', nickname: 'Shark_IL' },
+      { playerId: 2, name: 'Дмитрий Воронов', nickname: 'Raven' },
+      { playerId: 3, name: 'Александр Соколов', nickname: 'Falcon' },
+      { playerId: 4, name: 'Максим Волков', nickname: 'GreyWolf' },
+      { playerId: 5, name: 'Илья Морозов', nickname: 'Frost' },
+      { playerId: 6, name: 'Евгений Козлов', nickname: 'Architect' },
+    ]),
   },
   {
     id: 2,
@@ -55,7 +105,17 @@ let localAnnouncements: AnnouncementRecord[] = [
     description: 'Основной рейтинговый турнир вечера с объединением в финальный стол. Повышенная сетка очков по Шаблону B (1 место — 280 очков).',
     status: 'registration',
     spotsTotal: 20,
-    spotsTaken: 16,
+    spotsTaken: 8,
+    registeredPlayersJson: JSON.stringify([
+      { playerId: 1, name: 'Илья Лекалин', nickname: 'Shark_IL' },
+      { playerId: 2, name: 'Дмитрий Воронов', nickname: 'Raven' },
+      { playerId: 3, name: 'Александр Соколов', nickname: 'Falcon' },
+      { playerId: 4, name: 'Максим Волков', nickname: 'GreyWolf' },
+      { playerId: 7, name: 'Роман Лебедев', nickname: 'CheckRaise' },
+      { playerId: 8, name: 'Сергей Новиков', nickname: 'Novik' },
+      { playerId: 9, name: 'Кирилл Павлов', nickname: 'K_Ace' },
+      { playerId: 10, name: 'Никита Семёнов', nickname: 'AllIn_Nik' },
+    ]),
   },
   {
     id: 3,
@@ -65,7 +125,13 @@ let localAnnouncements: AnnouncementRecord[] = [
     description: 'Заключительный динамичный турнир вечера для самых стойких стратегов клуба. Начисление очков в сезонный рейтинг по Шаблону A.',
     status: 'upcoming',
     spotsTotal: 10,
-    spotsTaken: 6,
+    spotsTaken: 4,
+    registeredPlayersJson: JSON.stringify([
+      { playerId: 1, name: 'Илья Лекалин', nickname: 'Shark_IL' },
+      { playerId: 5, name: 'Илья Морозов', nickname: 'Frost' },
+      { playerId: 7, name: 'Роман Лебедев', nickname: 'CheckRaise' },
+      { playerId: 11, name: 'Андрей Голубев', nickname: 'Vegas' },
+    ]),
   },
 ];
 
@@ -95,6 +161,183 @@ let localClubContent: ClubContentRecord[] = [];
 function isDbConfigured(): boolean {
   const host = process.env.SQL_HOST;
   return Boolean(host && host !== '/cloudsql/instance' && process.env.SQL_DB_NAME && process.env.SQL_USER);
+}
+
+// --- User Accounts & Auth Repository ---
+
+function toUserAccount(row: {
+  id: number;
+  uid: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  playerId: number | null;
+}): UserAccount {
+  return {
+    id: row.id,
+    uid: row.uid,
+    email: row.email,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    role: row.role === 'dealer' ? 'dealer' : 'player',
+    playerId: row.playerId,
+  };
+}
+
+export async function registerUserAccount(data: {
+  firstName: string;
+  lastName: string;
+  nickname?: string;
+  email: string;
+  password: string;
+  role?: UserRole;
+}): Promise<{ user: UserAccount; player: PlayerRecord }> {
+  const cleanEmail = data.email.trim().toLowerCase();
+  const firstName = data.firstName.trim();
+  const lastName = data.lastName.trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+  const nickname = (data.nickname || '').trim();
+  const role: UserRole = data.role === 'dealer' ? 'dealer' : 'player';
+
+  if (!isDbConfigured()) {
+    const exists = localUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (exists) {
+      throw new Error('Пользователь с таким логином или Email уже зарегистрирован');
+    }
+
+    let linkedPlayer = localPlayers.find(
+      (p) => p.name.toLowerCase() === fullName.toLowerCase()
+    );
+    if (!linkedPlayer) {
+      linkedPlayer = await createPlayer({
+        name: fullName,
+        nickname,
+        notes: 'Участник клуба',
+      });
+    }
+
+    const createdUser: LocalUserStored = {
+      id: Date.now(),
+      uid: `user-${Date.now()}`,
+      email: cleanEmail,
+      firstName,
+      lastName,
+      passwordHash: data.password,
+      role,
+      playerId: linkedPlayer.id,
+    };
+    localUsers.push(createdUser);
+    return { user: toUserAccount(createdUser), player: linkedPlayer };
+  }
+
+  try {
+    const existingUsers = await db.select().from(users);
+    const duplicate = existingUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (duplicate) {
+      throw new Error('Пользователь с таким логином или Email уже зарегистрирован');
+    }
+
+    const allPlayers = await getAllPlayersOrdered();
+    let linkedPlayer = allPlayers.find(
+      (p) => p.name.toLowerCase() === fullName.toLowerCase()
+    );
+    if (!linkedPlayer) {
+      linkedPlayer = await createPlayer({
+        name: fullName,
+        nickname,
+        notes: 'Участник клуба',
+      });
+    }
+
+    const uid = `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const inserted = await db
+      .insert(users)
+      .values({
+        uid,
+        email: cleanEmail,
+        firstName,
+        lastName,
+        passwordHash: data.password,
+        role,
+        playerId: linkedPlayer.id,
+      })
+      .returning();
+
+    return {
+      user: toUserAccount(inserted[0]),
+      player: linkedPlayer,
+    };
+  } catch (error: any) {
+    console.error('Database query failed (registerUserAccount):', error);
+    throw new Error(error.message || 'Не удалось зарегистрировать аккаунт');
+  }
+}
+
+export async function authenticateUserAccount(
+  loginOrEmail: string,
+  password: string
+): Promise<UserAccount> {
+  const cleanLogin = loginOrEmail.trim().toLowerCase();
+
+  if (!isDbConfigured()) {
+    const found = localUsers.find(
+      (u) =>
+        (u.email.toLowerCase() === cleanLogin ||
+          `${u.firstName} ${u.lastName}`.toLowerCase() === cleanLogin) &&
+        u.passwordHash === password
+    );
+    if (!found) {
+      throw new Error('Неверный логин/Email или пароль');
+    }
+    return toUserAccount(found);
+  }
+
+  try {
+    const allUsers = await db.select().from(users);
+    const found = allUsers.find(
+      (u) =>
+        (u.email.toLowerCase() === cleanLogin ||
+          `${u.firstName} ${u.lastName}`.toLowerCase() === cleanLogin) &&
+        u.passwordHash === password
+    );
+
+    if (found) {
+      return toUserAccount(found);
+    }
+
+    // Fallback check against built-in default dealer accounts
+    const fallbackDealer = localUsers.find(
+      (u) => u.email.toLowerCase() === cleanLogin && u.passwordHash === password
+    );
+    if (fallbackDealer) {
+      return toUserAccount(fallbackDealer);
+    }
+
+    throw new Error('Неверный логин/Email или пароль');
+  } catch (error: any) {
+    console.error('Database query failed (authenticateUserAccount):', error);
+    throw new Error(error.message || 'Неверный логин/Email или пароль');
+  }
+}
+
+export async function getUserByUid(uid: string): Promise<UserAccount | null> {
+  if (!uid) return null;
+  if (!isDbConfigured()) {
+    const found = localUsers.find((u) => u.uid === uid);
+    return found ? toUserAccount(found) : null;
+  }
+  try {
+    const rows = await db.select().from(users).where(eq(users.uid, uid));
+    if (rows.length > 0) {
+      return toUserAccount(rows[0]);
+    }
+    const localFound = localUsers.find((u) => u.uid === uid);
+    return localFound ? toUserAccount(localFound) : null;
+  } catch {
+    const localFound = localUsers.find((u) => u.uid === uid);
+    return localFound ? toUserAccount(localFound) : null;
+  }
 }
 
 // 1. Players Repository
@@ -279,6 +522,7 @@ export async function incrementPlayerPenalty(playerId: number) {
   }
 }
 
+// 2. Announcements & Table Registration Repository
 export async function getAllAnnouncements(): Promise<AnnouncementRecord[]> {
   if (!isDbConfigured()) return localAnnouncements;
   try {
@@ -286,6 +530,66 @@ export async function getAllAnnouncements(): Promise<AnnouncementRecord[]> {
   } catch (error) {
     console.error('Database query failed (getAllAnnouncements):', error);
     return localAnnouncements;
+  }
+}
+
+export async function toggleAnnouncementTableRegistration(
+  announcementId: number,
+  playerEntry: TableRegisteredPlayer
+): Promise<{ announcements: AnnouncementRecord[]; registered: boolean }> {
+  const list = await getAllAnnouncements();
+  const target = list.find((a) => a.id === announcementId);
+  if (!target) {
+    throw new Error('Турнирный стол не найден');
+  }
+
+  const currentReg = parseRegisteredPlayers(target.registeredPlayersJson);
+  const alreadyIdx = currentReg.findIndex(
+    (r) =>
+      r.playerId === playerEntry.playerId ||
+      r.name.toLowerCase() === playerEntry.name.toLowerCase()
+  );
+
+  let nextReg: TableRegisteredPlayer[];
+  let registered: boolean;
+
+  if (alreadyIdx !== -1) {
+    nextReg = currentReg.filter((_, idx) => idx !== alreadyIdx);
+    registered = false;
+  } else {
+    if (currentReg.length >= target.spotsTotal) {
+      throw new Error('За этим столом уже заняты все места');
+    }
+    nextReg = [...currentReg, playerEntry];
+    registered = true;
+  }
+
+  const nextJson = JSON.stringify(nextReg);
+  const nextSpotsTaken = nextReg.length;
+
+  if (!isDbConfigured()) {
+    localAnnouncements = localAnnouncements.map((a) =>
+      a.id === announcementId
+        ? { ...a, registeredPlayersJson: nextJson, spotsTaken: nextSpotsTaken }
+        : a
+    );
+    return { announcements: localAnnouncements, registered };
+  }
+
+  try {
+    await db
+      .update(announcements)
+      .set({
+        registeredPlayersJson: nextJson,
+        spotsTaken: nextSpotsTaken,
+      })
+      .where(eq(announcements.id, announcementId));
+
+    const updatedList = await db.select().from(announcements).orderBy(asc(announcements.id));
+    return { announcements: updatedList, registered };
+  } catch (error: any) {
+    console.error('Database query failed (toggleAnnouncementTableRegistration):', error);
+    throw new Error('Не удалось обновить запись за стол');
   }
 }
 

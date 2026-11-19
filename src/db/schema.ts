@@ -1,12 +1,16 @@
 import { relations } from 'drizzle-orm';
 import { boolean, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
-// 1. Таблица пользователей (администраторов / дилеров), привязанная к Firebase Auth UID
+// 1. Таблица пользователей (игроков и дилеров клуба) с полноценной авторизацией
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   uid: text('uid').notNull().unique(),
   email: text('email').notNull(),
-  role: text('role').notNull().default('dealer'),
+  firstName: text('first_name').notNull().default(''),
+  lastName: text('last_name').notNull().default(''),
+  passwordHash: text('password_hash').notNull().default(''),
+  role: text('role').notNull().default('player'), // 'player' | 'dealer'
+  playerId: integer('player_id'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -26,7 +30,7 @@ export const players = pgTable('players', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-// 3. Таблица анонсов предстоящих турниров и новостей клуба (CMS)
+// 3. Таблица анонсов предстоящих турниров и записи игроков за стол
 export const announcements = pgTable('announcements', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
@@ -36,6 +40,7 @@ export const announcements = pgTable('announcements', {
   status: text('status').notNull().default('registration'), // 'registration' | 'upcoming' | 'completed'
   spotsTotal: integer('spots_total').notNull().default(20),
   spotsTaken: integer('spots_taken').notNull().default(14),
+  registeredPlayersJson: text('registered_players_json').notNull().default('[]'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

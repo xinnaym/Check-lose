@@ -6,6 +6,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
 import * as dotenv from 'dotenv';
 import {
+  authenticateUserAccount,
   awardPlayerTournamentPoints,
   createPlayer,
   deletePlayer,
@@ -14,10 +15,13 @@ import {
   getAllBlindLevels,
   getAllClubContent,
   getAllPlayersOrdered,
+  getUserByUid,
   incrementPlayerPenalty,
+  registerUserAccount,
   replaceAllBlindLevels,
   saveArchivedTournament,
   saveLiveStateSnapshot,
+  toggleAnnouncementTableRegistration,
   updatePlayer,
 } from './src/db/repository.ts';
 import {
@@ -28,15 +32,13 @@ import {
   LiveTournamentState,
   PenaltyType,
   TableFormat,
+  UserRole,
 } from './src/types/poker.ts';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const DEALER_PIN = process.env.DEALER_PIN || '25000';
-const DEALER_SESSION_TOKEN = 'cep-dealer-token-25000';
 
 const DEFAULT_BLIND_LEVELS: BlindLevelRecord[] = [
   { id: 1, levelOrder: 1, levelNumber: 1, isBreak: false, breakTitle: '', smallBlind: 100, bigBlind: 200, ante: 0, durationSeconds: 600 },
@@ -215,32 +217,165 @@ async function startServer() {
     }
   });
 
-  // --- Dealer Console Authentication ---
-  app.post('/api/admin/auth/login', (req, res) => {
-    const { pin } = req.body as { pin?: string };
-    const cleanPin = (pin || '').trim().toLowerCase();
-    const validPins = [DEALER_PIN.toLowerCase(), '25000', 'admin', 'check'];
-    if (validPins.includes(cleanPin)) {
+  // --- Full User Registration & Account Authentication ---
+
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const { firstName, lastName, nickname, email, password, role } = req.body as {
+        firstName?: string;
+        lastName?: string;
+        nickname?: string;
+        email?: string;
+        password?: string;
+        role?: UserRole;
+      };
+
+      if (!firstName?.trim() || !lastName?.trim()) {
+        return res.status(400).json({ error: 'Укажите ваши имя и фамилию' });
+      }
+      if (!email?.trim() || !password?.trim()) {
+        return res.status(400).json({ error: 'Укажите логин (или Email) и пароль' });
+      }
+      if (password.trim().length < 4) {
+        return res.status(400).json({ error: 'Пароль должен содержать минимум 4 символа' });
+      }
+
+      const assignedRole: UserRole = role === 'dealer' ? 'dealer' : 'player';
+
+      const { user } = await registerUserAccount({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        nickname: (nickname || '').trim(),
+        email: email.trim(),
+        password: password.trim(),
+        role: assignedRole,
+      });
+
+      const playersList = await getAllPlayersOrdered();
+      broadcast({ type: 'data:refresh', payload: { players: playersList } });
+
       return res.json({
-        authorized: true,
-        token: DEALER_SESSION_TOKEN,
+        user,
+        token: user.uid,
+        players: playersList,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        error: error.message || 'Ошибка регистрации аккаунта',
       });
     }
-    return res.status(401).json({
-      authorized: false,
-      error: 'Неверный ПИН-код дилера',
-    });
   });
 
-  app.get('/api/admin/auth/verify', (req, res) => {
-    const token = req.headers['x-dealer-token'];
-    res.json({ authorized: token === DEALER_SESSION_TOKEN });
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { login, password } = req.body as { login?: string; password?: string };
+      if (!login?.trim() || !password?.trim()) {
+        return res.status(400).json({ error: 'Введите логин/Email и пароль' });
+      }
+
+      const user = await authenticateUserAccount(login.trim(), password.trim());
+      return res.json({
+        user,
+        token: user.uid,
+      });
+    } catch (error: any) {
+      return res.status(401).json({
+        error: error.message || 'Неверный логин/Email или пароль',
+      });
+    }
   });
 
-  const requireDealerAuth: express.RequestHandler = (req, res, next) => {
-    const token = req.headers['x-dealer-token'];
-    if (token !== DEALER_SESSION_TOKEN) {
-      return res.status(401).json({ error: 'Доступ запрещён: войдите в Пульт дилера' });
+  app.get('/api/auth/me', async (req, res) => {
+    const tokenUid = String(req.headers['x-auth-token'] || '');
+    if (!tokenUid) {
+      return res.json({ user: null });
+    }
+    const user = await getUserByUid(tokenUid);
+    return res.json({ user });
+  });
+
+  // --- Table Registration for Authenticated Players ---
+  app.post('/api/tables/:id/register', async (req, res) => {
+    try {
+      const announcementId = Number(req.params.id);
+      const tokenUid = String(req.headers['x-auth-token'] || '');
+      const user = await getUserByUid(tokenUid);
+
+      const { playerId: bodyPlayerId, playerName: bodyPlayerName, nickname: bodyNickname } =
+        req.body as {
+          playerId?: number;
+          playerName?: string;
+          nickname?: string;
+        };
+
+      if (!user && !bodyPlayerName) {
+        return res.status(401).json({ error: 'Войдите в аккаунт для записи за стол' });
+      }
+
+      const allPlayers = await getAllPlayersOrdered();
+      const fullName = user
+        ? `${user.firstName} ${user.lastName}`.trim()
+        : (bodyPlayerName || '').trim();
+
+      let linkedPlayer = allPlayers.find(
+        (p) =>
+          (user?.playerId && p.id === user.playerId) ||
+          (bodyPlayerId && p.id === bodyPlayerId) ||
+          p.name.toLowerCase() === fullName.toLowerCase()
+      );
+
+      if (!linkedPlayer) {
+        linkedPlayer = await createPlayer({
+          name: fullName,
+          nickname: bodyNickname || '',
+          notes: 'Записался через сайт',
+        });
+      }
+
+      if (linkedPlayer.isBanned) {
+        return res.status(403).json({
+          error: `Запись заблокирована: игрок ${linkedPlayer.name} находится в бан-листе клуба`,
+        });
+      }
+
+      const { announcements: updatedAnnouncements, registered } =
+        await toggleAnnouncementTableRegistration(announcementId, {
+          playerId: linkedPlayer.id,
+          name: linkedPlayer.name,
+          nickname: linkedPlayer.nickname,
+        });
+
+      const updatedPlayers = await getAllPlayersOrdered();
+
+      broadcast({
+        type: 'data:refresh',
+        payload: {
+          announcements: updatedAnnouncements,
+          players: updatedPlayers,
+        },
+      });
+
+      return res.json({
+        announcements: updatedAnnouncements,
+        players: updatedPlayers,
+        registered,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        error: error.message || 'Не удалось записаться за стол',
+      });
+    }
+  });
+
+  // --- Dealer Role Middleware ---
+  const requireDealerAuth: express.RequestHandler = async (req, res, next) => {
+    const tokenUid = String(req.headers['x-auth-token'] || '');
+    if (!tokenUid) {
+      return res.status(401).json({ error: 'Доступ запрещён: войдите под учётной записью дилера' });
+    }
+    const user = await getUserByUid(tokenUid);
+    if (!user || user.role !== 'dealer') {
+      return res.status(403).json({ error: 'Доступ к пульту разрешён только учётным записям с ролью Дилер' });
     }
     next();
   };

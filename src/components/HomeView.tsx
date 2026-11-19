@@ -1,16 +1,39 @@
 import React, { useState } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
-import { TEMPLATE_A_POINTS, TEMPLATE_B_POINTS } from '../types/poker.ts';
+import {
+  parseRegisteredPlayers,
+  TEMPLATE_A_POINTS,
+  TEMPLATE_B_POINTS,
+} from '../types/poker.ts';
 import { CLUB_LOGO_PATH, NavTab } from '../App.tsx';
-import { ArrowRight, Play, ShieldAlert } from 'lucide-react';
+import {
+  ArrowRight,
+  Play,
+  ShieldAlert,
+  UserPlus,
+  CheckCircle2,
+  Users,
+  Ban,
+} from 'lucide-react';
 
 interface HomeViewProps {
   onNavigate: (tab: NavTab) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
-  const { announcements, blindLevels, liveState } = useClub();
+  const {
+    announcements,
+    blindLevels,
+    liveState,
+    currentUser,
+    players,
+    openAuthModal,
+    toggleTableRegistration,
+  } = useClub();
+
   const [selectedTemplate, setSelectedTemplate] = useState<'1_table' | '2_tables'>('1_table');
+  const [registeringTableId, setRegisteringTableId] = useState<number | null>(null);
+  const [tableNotice, setTableNotice] = useState<string | null>(null);
 
   const currentLevel =
     liveState && blindLevels.length > 0
@@ -21,6 +44,40 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const currentUserFullName = currentUser
+    ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+    : '';
+
+  const currentUserPlayerRecord = currentUser
+    ? players.find(
+        (p) =>
+          (currentUser.playerId && p.id === currentUser.playerId) ||
+          p.name.toLowerCase() === currentUserFullName.toLowerCase()
+      )
+    : null;
+
+  const handleTableSeatAction = async (announcementId: number, tableTitle: string) => {
+    if (!currentUser) {
+      openAuthModal('login');
+      return;
+    }
+    setRegisteringTableId(announcementId);
+    setTableNotice(null);
+    try {
+      const registered = await toggleTableRegistration(announcementId);
+      setTableNotice(
+        registered
+          ? `Вы записаны за стол «${tableTitle}» (${currentUserFullName})`
+          : `Запись за стол «${tableTitle}» отменена`
+      );
+      window.setTimeout(() => setTableNotice(null), 4000);
+    } catch (err: any) {
+      setTableNotice(err.message || 'Не удалось обновить запись за стол');
+    } finally {
+      setRegisteringTableId(null);
+    }
   };
 
   return (
@@ -76,13 +133,23 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
                 <ArrowRight className="h-4 w-4" />
               </button>
 
-              <button
-                onClick={() => onNavigate('admin')}
-                className="btn-glass inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold text-white whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                <Play className="h-4 w-4 text-[#F97316]" />
-                <span>Пульт дилера</span>
-              </button>
+              {!currentUser ? (
+                <button
+                  onClick={() => openAuthModal('register')}
+                  className="btn-glass inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold text-white whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <UserPlus className="h-4 w-4 text-[#F97316]" />
+                  <span>Регистрация на стол</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => onNavigate('admin')}
+                  className="btn-glass inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold text-white whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Play className="h-4 w-4 text-[#F97316]" />
+                  <span>Пульт дилера</span>
+                </button>
+              )}
 
               <button
                 onClick={() => onNavigate('leaderboard')}
@@ -162,46 +229,177 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* EVENING TOURNAMENTS (2-3 PER NIGHT) */}
+      {/* EVENING TOURNAMENTS & ONLINE TABLE SEAT REGISTRATION */}
       <section className="space-y-4 sm:space-y-5">
-        <div>
-          <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">
-            Расписание игрового вечера
-          </h2>
-          <p className="mt-1 text-xs sm:text-sm text-slate-400">
-            Проводим 2–3 турнира за вечер · Стартовый стек 25 000 фишек · Уровни по 10 минут
-          </p>
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+          <div>
+            <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">
+              Запись за турнирные столы вечера
+            </h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-400">
+              Зарегистрированные участники клуба могут заранее занять бокс за выбранным столом
+            </p>
+          </div>
+
+          {!currentUser && (
+            <button
+              onClick={() => openAuthModal('login')}
+              className="btn-glass self-start sm:self-auto inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-[#F97316] hover:text-white cursor-pointer"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              <span>Войдите для записи за стол</span>
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3">
-          {announcements.map((item, idx) => (
-            <div
-              key={item.id}
-              className="glass-card flex flex-col justify-between rounded-2xl p-5 sm:p-6"
+        {tableNotice && (
+          <div className="glass-crimson flex items-center justify-between rounded-2xl px-4 py-3 text-xs font-bold text-white">
+            <span>{tableNotice}</span>
+            <button
+              onClick={() => setTableNotice(null)}
+              className="text-orange-200 hover:text-white cursor-pointer"
             >
-              <div className="space-y-2.5 sm:space-y-3">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>Игра #{idx + 1}</span>
-                  <span className="font-mono-tabular font-bold text-[#F97316]">
-                    {item.eventDate}
-                  </span>
-                </div>
-                <h3 className="font-display text-base sm:text-lg font-bold text-white">
-                  {item.title}
-                </h3>
-                <p className="text-xs sm:text-sm leading-relaxed text-slate-300">
-                  {item.description}
-                </p>
-              </div>
+              ✕
+            </button>
+          </div>
+        )}
 
-              <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-3.5 text-xs text-slate-400">
-                <span>{item.format.split('•')[0]}</span>
-                <span className="font-mono-tabular font-semibold text-white">
-                  Мест: {item.spotsTaken}/{item.spotsTotal}
-                </span>
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-3">
+          {announcements.map((item, idx) => {
+            const registeredList = parseRegisteredPlayers(item.registeredPlayersJson);
+            const count = registeredList.length;
+            const isUserRegistered = Boolean(
+              currentUser &&
+                registeredList.some(
+                  (r) =>
+                    (currentUser.playerId && r.playerId === currentUser.playerId) ||
+                    r.name.toLowerCase() === currentUserFullName.toLowerCase()
+                )
+            );
+            const isFull = count >= item.spotsTotal;
+            const isBanned = Boolean(currentUserPlayerRecord?.isBanned);
+            const fillPct = Math.min(100, Math.round((count / item.spotsTotal) * 100));
+
+            return (
+              <div
+                key={item.id}
+                className={`flex flex-col justify-between rounded-2xl p-5 sm:p-6 transition-all ${
+                  isUserRegistered ? 'glass-crimson' : 'glass-card'
+                }`}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-semibold text-slate-300">Стол #{idx + 1}</span>
+                    <span className="font-mono-tabular font-bold text-[#F97316]">
+                      {item.eventDate}
+                    </span>
+                  </div>
+
+                  <h3 className="font-display text-base sm:text-lg font-bold text-white">
+                    {item.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm leading-relaxed text-slate-300">
+                    {item.description}
+                  </p>
+
+                  {/* Seat Progress Bar */}
+                  <div className="pt-2 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">{item.format.split('•')[0]}</span>
+                      <span className="font-mono-tabular font-bold text-white">
+                        Занято мест: {count} / {item.spotsTotal}
+                      </span>
+                    </div>
+                    <div className="glass-well h-2 w-full overflow-hidden rounded-full">
+                      <div
+                        className="h-full bg-gradient-to-r from-[#EA580C] to-[#FB923C] transition-all duration-300"
+                        style={{ width: `${fillPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Registered Players Roster */}
+                  <div className="pt-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                      <Users className="h-3.5 w-3.5 text-[#F97316]" />
+                      <span>Записались за стол ({count}):</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {registeredList.length === 0 ? (
+                        <span className="text-xs text-slate-500">Пока никто не записался</span>
+                      ) : (
+                        registeredList.map((reg) => {
+                          const isMe =
+                            currentUser &&
+                            ((currentUser.playerId && reg.playerId === currentUser.playerId) ||
+                              reg.name.toLowerCase() === currentUserFullName.toLowerCase());
+                          return (
+                            <span
+                              key={`${item.id}-${reg.playerId}-${reg.name}`}
+                              className={`rounded-lg px-2 py-1 text-[11px] font-medium ${
+                                isMe
+                                  ? 'bg-[#F97316] font-bold text-black'
+                                  : 'border border-white/10 bg-black/40 text-slate-200'
+                              }`}
+                            >
+                              {reg.name}
+                            </span>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table Registration Action Button */}
+                <div className="mt-5 border-t border-white/10 pt-4">
+                  {!currentUser ? (
+                    <button
+                      type="button"
+                      onClick={() => openAuthModal('login')}
+                      className="btn-glass w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-extrabold text-white cursor-pointer"
+                    >
+                      <UserPlus className="h-3.5 w-3.5 text-[#F97316]" />
+                      <span>Войти и записаться за стол</span>
+                    </button>
+                  ) : isBanned ? (
+                    <div className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 py-2.5 text-xs font-bold text-rose-300">
+                      <Ban className="h-3.5 w-3.5" />
+                      <span>Запись недоступна (Бан в клубе)</span>
+                    </div>
+                  ) : isUserRegistered ? (
+                    <button
+                      type="button"
+                      disabled={registeringTableId === item.id}
+                      onClick={() => handleTableSeatAction(item.id, item.title)}
+                      className="btn-glass w-full inline-flex items-center justify-center gap-2 rounded-xl border-emerald-400/50 py-2.5 text-xs font-extrabold text-emerald-300 hover:text-white cursor-pointer"
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                      <span>Вы записаны ✓ (Отменить запись)</span>
+                    </button>
+                  ) : isFull ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="glass-well w-full rounded-xl py-2.5 text-xs font-bold text-slate-500 cursor-not-allowed"
+                    >
+                      Все места за столом заняты ({item.spotsTotal}/{item.spotsTotal})
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={registeringTableId === item.id}
+                      onClick={() => handleTableSeatAction(item.id, item.title)}
+                      className="btn-crimson w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-extrabold cursor-pointer"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Записаться за этот стол</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

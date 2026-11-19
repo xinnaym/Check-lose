@@ -9,7 +9,8 @@ import { HomeView } from './components/HomeView.tsx';
 import { LeaderboardView } from './components/LeaderboardView.tsx';
 import { LiveTimerView } from './components/LiveTimerView.tsx';
 import { AdminView } from './components/AdminView.tsx';
-import { Lock, Tv, Trophy, ShieldAlert, Spade } from 'lucide-react';
+import { AuthModal } from './components/AuthModal.tsx';
+import { Lock, Tv, Trophy, ShieldAlert, Spade, User, LogOut } from 'lucide-react';
 
 export type NavTab = 'home' | 'leaderboard' | 'live' | 'admin';
 
@@ -17,7 +18,15 @@ export const CLUB_LOGO_PATH = `${import.meta.env.BASE_URL}assets/aistudio/IMG_15
 
 const ClubLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
-  const { loading, error, refreshAll, isDealerAuthorized } = useClub();
+  const {
+    loading,
+    error,
+    refreshAll,
+    currentUser,
+    isDealerAuthorized,
+    openAuthModal,
+    logoutUser,
+  } = useClub();
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#060608] text-[#F8FAFC] selection:bg-[#F97316] selection:text-black">
@@ -46,7 +55,7 @@ const ClubLayout: React.FC = () => {
 
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#060608]/85 backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-3 px-3.5 py-3 sm:gap-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-2.5 px-3.5 py-3 sm:gap-6 sm:px-6 lg:px-8">
           {/* Zone 1: Brand with Attached Club Logo */}
           <button
             onClick={() => setActiveTab('home')}
@@ -58,7 +67,7 @@ const ClubLayout: React.FC = () => {
               className="h-9 w-9 sm:h-11 sm:w-11 rounded-full border border-[#F97316]/50 object-cover shadow-md transition-transform group-hover:scale-105"
               referrerPolicy="no-referrer"
             />
-            <span className="font-display text-base sm:text-lg font-extrabold tracking-tight text-white">
+            <span className="font-display text-sm sm:text-lg font-extrabold tracking-tight text-white">
               Чек это{' '}
               <span className="rounded-md bg-[#F97316] px-1.5 py-0.5 text-[#060608]">
                 проигрыш
@@ -67,7 +76,7 @@ const ClubLayout: React.FC = () => {
           </button>
 
           {/* Zone 2: Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-7 lg:gap-8 text-sm font-medium text-slate-400">
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-sm font-medium text-slate-400">
             <button
               onClick={() => setActiveTab('home')}
               className={`transition-colors whitespace-nowrap shrink-0 cursor-pointer hover:text-white ${
@@ -76,7 +85,7 @@ const ClubLayout: React.FC = () => {
                   : ''
               }`}
             >
-              Клуб и правила
+              Клуб и столы
             </button>
             <button
               onClick={() => setActiveTab('leaderboard')}
@@ -101,8 +110,41 @@ const ClubLayout: React.FC = () => {
             </button>
           </nav>
 
-          {/* Zone 3: Primary TV Timer Action */}
+          {/* Zone 3: User Account & TV Timer Action */}
           <div className="flex items-center gap-2 shrink-0">
+            {currentUser ? (
+              <div className="glass-well flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs">
+                <span
+                  className={`rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
+                    currentUser.role === 'dealer'
+                      ? 'bg-[#F97316] text-black'
+                      : 'bg-emerald-500/20 text-emerald-400'
+                  }`}
+                >
+                  {currentUser.role === 'dealer' ? 'ДИЛЕР' : 'ИГРОК'}
+                </span>
+                <span className="max-w-[110px] sm:max-w-[150px] truncate font-bold text-white">
+                  {currentUser.firstName} {currentUser.lastName}
+                </span>
+                <button
+                  onClick={logoutUser}
+                  title="Выйти из аккаунта"
+                  className="text-slate-400 hover:text-white cursor-pointer pl-1"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => openAuthModal('login')}
+                className="btn-glass inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-white whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <User className="h-3.5 w-3.5 text-[#F97316]" />
+                <span>Войти</span>
+                <span className="hidden sm:inline">/ Регистрация</span>
+              </button>
+            )}
+
             <button
               onClick={() => setActiveTab('live')}
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 sm:px-4 sm:py-2 text-xs font-extrabold whitespace-nowrap shrink-0 cursor-pointer ${
@@ -110,8 +152,8 @@ const ClubLayout: React.FC = () => {
               }`}
             >
               <Tv className="h-3.5 w-3.5" />
-              <span>Live-Таймер</span>
-              <span className="hidden sm:inline">(ТВ)</span>
+              <span className="hidden xs:inline">Live-Таймер</span>
+              <span className="xs:hidden">ТВ</span>
             </button>
           </div>
         </div>
@@ -127,7 +169,7 @@ const ClubLayout: React.FC = () => {
             }`}
           >
             <Spade className="h-3.5 w-3.5 text-[#F97316]" />
-            <span>Клуб</span>
+            <span>Столы</span>
           </button>
           <button
             onClick={() => setActiveTab('leaderboard')}
@@ -204,7 +246,10 @@ const ClubLayout: React.FC = () => {
         )}
       </main>
 
-      {/* Clean Footer with Club Logo & Mandatory Legal Notice */}
+      {/* Account Login / Registration Modal */}
+      <AuthModal />
+
+      {/* Clean Footer with Club Logo */}
       <footer className="relative z-10 mt-10 border-t border-white/10 bg-[#060608]/90 py-6 text-xs text-slate-400 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1360px] flex-col justify-between gap-4 px-4 sm:flex-row sm:items-center sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">

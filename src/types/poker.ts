@@ -1,5 +1,23 @@
 export type TableFormat = '1_table' | '2_tables';
 
+export type UserRole = 'player' | 'dealer';
+
+export interface UserAccount {
+  id: number;
+  uid: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  playerId: number | null;
+}
+
+export interface TableRegisteredPlayer {
+  playerId: number;
+  name: string;
+  nickname: string;
+}
+
 export const TEMPLATE_A_POINTS: Record<number, number> = {
   1: 150,
   2: 110,
@@ -68,6 +86,17 @@ export interface AnnouncementRecord {
   status: string;
   spotsTotal: number;
   spotsTaken: number;
+  registeredPlayersJson: string;
+}
+
+export function parseRegisteredPlayers(jsonStr?: string): TableRegisteredPlayer[] {
+  if (!jsonStr) return [];
+  try {
+    const parsed = JSON.parse(jsonStr);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 export interface ClubContentRecord {
