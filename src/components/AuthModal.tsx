@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useClub } from '../context/ClubContext.tsx';
 import { CLUB_LOGO_PATH } from '../App.tsx';
-import { UserRole } from '../types/poker.ts';
-import { X, User, KeyRound, Mail, ShieldCheck, Sparkles } from 'lucide-react';
+import { X, User, KeyRound, Mail, Sparkles } from 'lucide-react';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -19,7 +18,6 @@ export const AuthModal: React.FC = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [nickname, setNickname] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('player');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +31,12 @@ export const AuthModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (mode === 'register' && passwordInput.trim().length < 6) {
+      setError('Пароль должен содержать минимум 6 символов');
+      return;
+    }
+
     setBusy(true);
     try {
       if (mode === 'login') {
@@ -44,7 +48,6 @@ export const AuthModal: React.FC = () => {
           nickname,
           email: loginInput,
           password: passwordInput,
-          role: selectedRole,
         });
       }
       closeAuthModal();
@@ -84,7 +87,7 @@ export const AuthModal: React.FC = () => {
               ЛИЧНЫЙ КАБИНЕТ КЛУБА
             </div>
             <h2 className="font-display text-xl sm:text-2xl font-extrabold text-white">
-              {mode === 'login' ? 'Вход в аккаунт' : 'Регистрация в клубе'}
+              {mode === 'login' ? 'Вход в аккаунт' : 'Регистрация игрока'}
             </h2>
           </div>
         </div>
@@ -113,7 +116,7 @@ export const AuthModal: React.FC = () => {
               mode === 'register' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Регистрация
+            Регистрация игрока
           </button>
         </div>
 
@@ -167,37 +170,6 @@ export const AuthModal: React.FC = () => {
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-300">
-                  Тип учётной записи
-                </label>
-                <div className="glass-well flex items-center gap-1 rounded-xl p-1">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('player')}
-                    className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
-                      selectedRole === 'player'
-                        ? 'bg-white/15 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    Игрок клуба
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('dealer')}
-                    className={`flex-1 inline-flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
-                      selectedRole === 'dealer'
-                        ? 'bg-[#F97316] text-black'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    <span>Дилер клуба</span>
-                  </button>
-                </div>
-              </div>
             </>
           )}
 
@@ -220,16 +192,17 @@ export const AuthModal: React.FC = () => {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-300">
-              Пароль *
+              Пароль (минимум 6 символов) *
             </label>
             <div className="relative">
               <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="password"
                 required
+                minLength={mode === 'register' ? 6 : 1}
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Минимум 4 символа..."
+                placeholder="Минимум 6 символов..."
                 className="glass-well w-full rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
               />
             </div>
@@ -250,7 +223,7 @@ export const AuthModal: React.FC = () => {
               ? 'Подождите...'
               : mode === 'login'
                 ? 'Войти в аккаунт'
-                : 'Создать аккаунт и войти'}
+                : 'Зарегистрироваться как игрок'}
           </button>
         </form>
       </div>

@@ -221,13 +221,12 @@ async function startServer() {
 
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { firstName, lastName, nickname, email, password, role } = req.body as {
+      const { firstName, lastName, nickname, email, password } = req.body as {
         firstName?: string;
         lastName?: string;
         nickname?: string;
         email?: string;
         password?: string;
-        role?: UserRole;
       };
 
       if (!firstName?.trim() || !lastName?.trim()) {
@@ -236,11 +235,9 @@ async function startServer() {
       if (!email?.trim() || !password?.trim()) {
         return res.status(400).json({ error: 'Укажите логин (или Email) и пароль' });
       }
-      if (password.trim().length < 4) {
-        return res.status(400).json({ error: 'Пароль должен содержать минимум 4 символа' });
+      if (password.trim().length < 6) {
+        return res.status(400).json({ error: 'Пароль должен содержать минимум 6 символов' });
       }
-
-      const assignedRole: UserRole = role === 'dealer' ? 'dealer' : 'player';
 
       const { user } = await registerUserAccount({
         firstName: firstName.trim(),
@@ -248,7 +245,6 @@ async function startServer() {
         nickname: (nickname || '').trim(),
         email: email.trim(),
         password: password.trim(),
-        role: assignedRole,
       });
 
       const playersList = await getAllPlayersOrdered();

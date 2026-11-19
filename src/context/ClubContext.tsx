@@ -18,7 +18,7 @@ import {
 
 const AUTH_USER_STORAGE_KEY = 'cep_auth_user_v1';
 const AUTH_TOKEN_STORAGE_KEY = 'cep_auth_token_v1';
-const STATIC_USERS_STORAGE_KEY = 'cep_static_users_v1';
+const STATIC_USERS_STORAGE_KEY = 'cep_static_users_v2';
 const STATIC_STATE_STORAGE_KEY = 'cep_static_club_state_v3';
 
 interface StoredStaticUser extends UserAccount {
@@ -45,16 +45,6 @@ const DEFAULT_STATIC_USERS: StoredStaticUser[] = [
     passwordHash: 'dealer25000',
     role: 'dealer',
     playerId: null,
-  },
-  {
-    id: 3,
-    uid: 'player-1',
-    email: 'lekalin@checkclub.ru',
-    firstName: 'Илья',
-    lastName: 'Лекалин',
-    passwordHash: '25000',
-    role: 'dealer',
-    playerId: 1,
   },
 ];
 
@@ -246,7 +236,6 @@ interface ClubContextValue {
     nickname?: string;
     email: string;
     password: string;
-    role?: UserRole;
   }) => Promise<UserAccount>;
   logoutUser: () => void;
   toggleTableRegistration: (announcementId: number) => Promise<boolean>;
@@ -611,14 +600,13 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     nickname?: string;
     email: string;
     password: string;
-    role?: UserRole;
   }): Promise<UserAccount> => {
     const firstName = payload.firstName.trim();
     const lastName = payload.lastName.trim();
     const email = payload.email.trim().toLowerCase();
     const password = payload.password.trim();
     const nickname = (payload.nickname || '').trim();
-    const role: UserRole = payload.role === 'dealer' ? 'dealer' : 'player';
+    const role: UserRole = 'player';
 
     if (!firstName || !lastName) {
       throw new Error('Укажите ваши имя и фамилию');
@@ -626,13 +614,16 @@ export const ClubProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!email || !password) {
       throw new Error('Укажите логин/Email и пароль');
     }
+    if (password.length < 6) {
+      throw new Error('Пароль должен содержать минимум 6 символов');
+    }
 
     if (serverAvailableRef.current) {
       try {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ firstName, lastName, nickname, email, password, role }),
+          body: JSON.stringify({ firstName, lastName, nickname, email, password }),
         });
         const rawText = await res.text();
         if (rawText.trim().startsWith('{')) {

@@ -40,7 +40,6 @@ export const AdminView: React.FC = () => {
     currentUser,
     isDealerAuthorized,
     loginUser,
-    registerUser,
     logoutUser,
     controlTimer,
     eliminatePlayer,
@@ -55,11 +54,8 @@ export const AdminView: React.FC = () => {
   } = useClub();
 
   // Dealer Account Auth State
-  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
-  const [firstNameInput, setFirstNameInput] = useState('');
-  const [lastNameInput, setLastNameInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -116,24 +112,14 @@ export const AdminView: React.FC = () => {
     setAuthLoading(true);
     setAuthError(null);
     try {
-      if (authTab === 'login') {
-        const user = await loginUser(loginInput.trim(), passwordInput.trim());
-        if (user.role !== 'dealer') {
-          setAuthError(
-            `Учётная запись «${user.firstName} ${user.lastName}» имеет роль Игрок. Войдите под учётной записью Дилера или создайте аккаунт дилера.`
-          );
-        }
-      } else {
-        await registerUser({
-          firstName: firstNameInput.trim(),
-          lastName: lastNameInput.trim(),
-          email: loginInput.trim(),
-          password: passwordInput.trim(),
-          role: 'dealer',
-        });
+      const user = await loginUser(loginInput.trim(), passwordInput.trim());
+      if (user.role !== 'dealer') {
+        setAuthError(
+          `Учётная запись «${user.firstName} ${user.lastName}» имеет роль Игрок. Доступ к пульту открыт только для учётной записи Дилера.`
+        );
       }
     } catch (err: any) {
-      setAuthError(err.message || 'Неверный логин или пароль');
+      setAuthError(err.message || 'Неверный логин или пароль дилера');
     } finally {
       setAuthLoading(false);
     }
@@ -162,8 +148,8 @@ export const AdminView: React.FC = () => {
               Пульт дилера
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Войдите под личной учётной записью дилера клуба для управления таймером, рассадкой,
-              штрафами и бан-листом.
+              Войдите под клубной учётной записью дилера для управления таймером, рассадкой,
+              штрафами и бан-листом участников.
             </p>
           </div>
 
@@ -185,72 +171,10 @@ export const AdminView: React.FC = () => {
             </div>
           )}
 
-          {/* Switch between Dealer Login and Dealer Account Registration */}
-          <div className="glass-well flex items-center gap-1 rounded-xl p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthTab('login');
-                setAuthError(null);
-              }}
-              className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
-                authTab === 'login' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Вход дилера
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthTab('register');
-                setAuthError(null);
-              }}
-              className={`flex-1 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
-                authTab === 'register' ? 'btn-crimson' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Регистрация дилера
-            </button>
-          </div>
-
           <form onSubmit={handleDealerAuthSubmit} className="space-y-4 text-left">
-            {authTab === 'register' && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Имя дилера *
-                  </label>
-                  <div className="relative">
-                    <User className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      required
-                      value={firstNameInput}
-                      onChange={(e) => setFirstNameInput(e.target.value)}
-                      placeholder="Имя"
-                      className="glass-well w-full rounded-xl py-2.5 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Фамилия *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={lastNameInput}
-                    onChange={(e) => setLastNameInput(e.target.value)}
-                    placeholder="Фамилия"
-                    className="glass-well w-full rounded-xl py-2.5 px-3 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Логин или Email учётной записи *
+                Логин или Email дилера *
               </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -277,7 +201,7 @@ export const AdminView: React.FC = () => {
                   required
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Введите пароль..."
+                  placeholder="Введите пароль дилера..."
                   className="glass-well w-full rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-[#F97316] focus:outline-none"
                 />
               </div>
@@ -294,11 +218,7 @@ export const AdminView: React.FC = () => {
               disabled={authLoading}
               className="btn-crimson w-full rounded-xl py-3 text-sm font-extrabold disabled:opacity-40 cursor-pointer"
             >
-              {authLoading
-                ? 'Проверка учётной записи...'
-                : authTab === 'login'
-                  ? 'Войти в Пульт дилера'
-                  : 'Зарегистрировать дилера и войти'}
+              {authLoading ? 'Проверка учётной записи...' : 'Войти в Пульт дилера'}
             </button>
           </form>
         </div>
